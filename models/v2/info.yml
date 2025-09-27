@@ -1,0 +1,4 @@
+version: v2
+environment: FrozenLake-v1
+gamma: 0.99
+alpha: 0.3
