@@ -5,7 +5,7 @@ logger = logging.getLogger("demo")
 
 import gymnasium as gym
 
-from speechfulagent import Agent, train, play
+from speechfulagent import Agent, Trainer, play
 
 
 ENVIRONMENT = "FrozenLake-v1"
@@ -14,14 +14,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("script", choices=["train", "play"])
 
-    parser.add_argument("-g", "--gamma", default=0.9)
-    parser.add_argument("-a", "--alpha", default=0.5)
+    parser.add_argument("--gamma", default=0.9)
 
-    parser.add_argument("-s", "--save-dir", default=".")
-    parser.add_argument("-v", "--version", default="latest")
+    parser.add_argument("--save-dir", default=".")
+    parser.add_argument("--version", default="latest")
 
-    parser.add_argument("-o", "--objective", default=0.8)
-    parser.add_argument("-t", "--test-episodes", default=20)
+    parser.add_argument("--objective", default=0.8)
     parser.add_argument("--verbose", action="store_true")
 
     parser.add_argument("--video", default="videos")
