@@ -8,7 +8,7 @@ def play(env: gym.Env, agent: Agent) -> float:
     state, _ = env.reset()
     agent.init_state(state)
     while True:
-        exp = agent.play_step(env)
+        exp = agent.step(env)
         if exp.done:
             break
     return agent.total_reward

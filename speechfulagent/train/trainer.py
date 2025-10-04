@@ -7,7 +7,8 @@ import torch.optim as optim
 from torch.utils.tensorboard.writer import SummaryWriter
 import gymnasium as gym
 
-from replay_buffer import ReplayBuffer
+from .replay_buffer import ReplayBuffer
+from .wrappers import RewardWrapper
 from speechfulagent.agent import Agent, DQN
 from speechfulagent.dataclasses import *
 
@@ -28,7 +29,7 @@ class Trainer:
             epsilon_decay_final: float,
             logger = None
         ):
-        self.env = env
+        self.env = RewardWrapper(env)
 
         self.objective = objective
 
@@ -37,8 +38,8 @@ class Trainer:
         self.replay_buffer = ReplayBuffer(replay_buffer_size)
         self.replay_buffer_start_size = replay_buffer_start_size
 
-        self.train_net = DQN(env.observation_space.shape[0], env.action_space.n)
-        self.target_net = DQN(env.observation_space.shape[0], env.action_space.n)
+        self.train_net = DQN(env.observation_space.n, env.action_space.n)
+        self.target_net = DQN(env.observation_space.n, env.action_space.n)
         self.sync_target_frames = sync_target_frames
         self.batch_size = batch_size
         self.optim = optim.Adam(params=self.train_net.parameters(), lr=learning_rate)
@@ -52,7 +53,13 @@ class Trainer:
 
         self.agent = Agent()
         self.agent.net = self.train_net
+        self.agent.version = "training"
 
+    def _ohe(self, x):
+        enc = np.zeros(self.env.observation_space.n)
+        enc[x] = 1
+        return enc
+    
     def _batch_to_tensors(
             self, 
             batch: tt.List[Experience]
@@ -64,10 +71,10 @@ class Trainer:
             rewards.append(e.reward)
             next_states.append(e.next_state)
             dones.append(e.done)
-        states_t = torch.as_tensor(states)
+        states_t = torch.as_tensor(self._ohe(states))
         actions_t = torch.as_tensor(actions)
         rewards_t = torch.as_tensor(rewards)
-        next_states_t = torch.as_tensor(next_states)
+        next_states_t = torch.as_tensor(self._ohe(next_states))
         dones_t = torch.as_tensor(dones)
         return states_t, actions_t, rewards_t, next_states_t, dones_t
     
@@ -99,7 +106,7 @@ class Trainer:
                 self.epsilon_decay_start - n_iter / self.epsilon_decay_last_frame
             )
 
-            exp = self.agent.play_step(self.env, epsilon)
+            exp = self.agent.step(self.env, epsilon)
             if exp.done:
                 reward = self.agent.total_reward
                 total_rewards.append(reward)
@@ -107,7 +114,7 @@ class Trainer:
                 if self.logger:
                     self.logger.info(
                         f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}, " + \
-                        "epsilon {epsilon:.2f}"
+                        f"epsilon {epsilon:.2f}"
                     )
                 writer.add_scalar("epsilon", epsilon, n_iter)
                 writer.add_scalar("reward_100", m_reward, n_iter)

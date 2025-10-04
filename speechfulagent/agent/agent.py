@@ -1,5 +1,4 @@
 import os
-import typing as tt
 
 import numpy as np
 import torch
@@ -10,7 +9,7 @@ from yamlmaker import generate
 from speechfulagent.types import *
 from speechfulagent.dataclasses import *
 from speechfulagent.versioning import VersioningMixin
-from speechfulagent.agent import DQN
+from .net import DQN
 
 
 class Agent(VersioningMixin):
@@ -26,14 +25,19 @@ class Agent(VersioningMixin):
 
     def init_state(self, state: State):
         self.env_state = state
+
+    def _ohe(self, x, size):
+        enc = np.zeros(size)
+        enc[x] = 1
+        return enc
     
     @torch.no_grad()
-    def play_step(self, env: gym.Env, epsilon: float = 0.0) -> Experience:
+    def step(self, env: gym.Env, epsilon: float = 0.0) -> Experience:
         self.get_version()
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            state_t = torch.as_tensor(self.env_state)
+            state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
             state_t.unsqueeze_(0)
             q_values = self.net(state_t)
             _, act_t = torch.max(q_values, dim=1)
