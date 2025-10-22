@@ -21,7 +21,7 @@ if __name__ == "__main__":
     env = gym.make(ENVIRONMENT, is_slippery=False)
     trainer = Trainer(
         env=env,
-        objective=0.99,
+        objective=4.7,
         gamma=0.99,
         replay_buffer_size=10000,
         replay_buffer_start_size=10000,

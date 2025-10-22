@@ -29,8 +29,7 @@ class Trainer:
             epsilon_decay_final: float,
             logger = None
         ):
-        # self.env = RewardWrapper(env)
-        self.env = env
+        self.env = RewardWrapper(env)
 
         self.objective = objective
 
