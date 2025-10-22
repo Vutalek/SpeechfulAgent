@@ -18,19 +18,19 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    env = gym.make(ENVIRONMENT)
+    env = gym.make(ENVIRONMENT, is_slippery=False)
     trainer = Trainer(
         env=env,
-        objective=1,
-        gamma=0.95,
-        replay_buffer_size=50000,
-        replay_buffer_start_size=50000,
-        batch_size=64,
-        learning_rate=0.1,
-        sync_target_frames=100,
-        epsilon_decay_last_frame=100000,
+        objective=0.9,
+        gamma=0.99,
+        replay_buffer_size=10000,
+        replay_buffer_start_size=10000,
+        batch_size=32,
+        learning_rate=1e-4,
+        sync_target_frames=1000,
+        epsilon_decay_last_frame=20000,
         epsilon_decay_start=1.0,
-        epsilon_decay_final=0.1,
+        epsilon_decay_final=0.01,
         logger=logger if args.verbose else None
     )
     logger.info("start training")

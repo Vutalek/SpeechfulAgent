@@ -27,14 +27,3 @@ if __name__ == "__main__":
     logger.info(f"model version: {agent.get_version()}")
     play(env, agent)
     env.close()
-
-    # if args.script == "train":
-    #     env = gym.make(ENVIRONMENT)
-    #     agent = Agent(env, float(args.gamma), float(args.alpha))
-    #     logger.info("start training")
-    #     if args.verbose:
-    #         train(agent, gym.make(ENVIRONMENT), int(args.test_episodes), float(args.objective), logger)
-    #     else:
-    #         train(agent, gym.make(ENVIRONMENT), int(args.test_episodes), float(args.objective))
-    #     logger.info("saving model")
-    #     agent.save_model(args.save_dir)

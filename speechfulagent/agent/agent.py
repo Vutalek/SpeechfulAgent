@@ -47,7 +47,7 @@ class Agent(VersioningMixin):
         self.total_reward += reward
 
         old_state = self.env_state
-        self.state = next_state
+        self.env_state = next_state
 
         done = is_done or is_trunc
         exp = Experience(
@@ -95,5 +95,5 @@ class Agent(VersioningMixin):
             map_location=lambda stg, _: stg,
             weights_only=True
         )
-        self.net = DQN(data["input_shape"], data["n_actions"])
+        self.net = DQN(data["environment"]["input_shape"], data["environment"]["n_actions"])
         self.net.load_state_dict(state_dict)

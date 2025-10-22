@@ -29,7 +29,8 @@ class Trainer:
             epsilon_decay_final: float,
             logger = None
         ):
-        self.env = RewardWrapper(env)
+        # self.env = RewardWrapper(env)
+        self.env = env
 
         self.objective = objective
 
@@ -54,11 +55,6 @@ class Trainer:
         self.agent = Agent()
         self.agent.net = self.train_net
         self.agent.version = "training"
-
-    def _ohe(self, x):
-        enc = np.zeros(self.env.observation_space.n)
-        enc[x] = 1
-        return enc
     
     def _batch_to_tensors(
             self, 
@@ -71,10 +67,10 @@ class Trainer:
             rewards.append(e.reward)
             next_states.append(e.next_state)
             dones.append(e.done)
-        states_t = torch.as_tensor(self._ohe(states))
+        states_t = F.one_hot(torch.as_tensor(states), self.env.observation_space.n)
         actions_t = torch.as_tensor(actions)
         rewards_t = torch.as_tensor(rewards)
-        next_states_t = torch.as_tensor(self._ohe(next_states))
+        next_states_t = F.one_hot(torch.as_tensor(next_states), self.env.observation_space.n)
         dones_t = torch.as_tensor(dones)
         return states_t, actions_t, rewards_t, next_states_t, dones_t
     
@@ -107,6 +103,7 @@ class Trainer:
             )
 
             exp = self.agent.step(self.env, epsilon)
+            self.replay_buffer.append(exp)
             if exp.done:
                 reward = self.agent.total_reward
                 total_rewards.append(reward)
@@ -143,8 +140,8 @@ class Trainer:
 
         env_info = EnvInfo(
             self.env.spec.id,
-            self.env.observation_space.shape[0],
-            self.env.action_space.n
+            int(self.env.observation_space.n),
+            int(self.env.action_space.n)
         )
         train_info = TrainInfo(
             n_iter,
