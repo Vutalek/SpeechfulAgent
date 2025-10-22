@@ -27,3 +27,4 @@ if __name__ == "__main__":
     logger.info(f"model version: {agent.get_version()}")
     play(env, agent)
     env.close()
+    logger.info(f"Total reward: {agent.total_reward}")
