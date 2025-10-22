@@ -11,42 +11,44 @@
 Использование
 
 ```
-python demo.py --help
-
-usage: demo.py [-h] [-g GAMMA] [-a ALPHA] [-s SAVE_DIR] [-v VERSION] [-o OBJECTIVE] [-t TEST_EPISODES] [--verbose] [--video VIDEO]
-               {train,play}
-
-positional arguments:
-  {train,play}
+python train.py --help
+usage: train.py [-h] [--model-dir MODEL_DIR] [--verbose]
 
 options:
   -h, --help            show this help message and exit
-  -g GAMMA, --gamma GAMMA
-  -a ALPHA, --alpha ALPHA
-  -s SAVE_DIR, --save-dir SAVE_DIR
-  -v VERSION, --version VERSION
-  -o OBJECTIVE, --objective OBJECTIVE
-  -t TEST_EPISODES, --test-episodes TEST_EPISODES
+  --model-dir MODEL_DIR
   --verbose
+```
+
+```
+python demo.py --help 
+usage: demo.py [-h] [--model-dir MODEL_DIR] [--version VERSION] [--video VIDEO]
+
+options:
+  -h, --help            show this help message and exit
+  --model-dir MODEL_DIR
+  --version VERSION
   --video VIDEO
 ```
+
+Релизован алгоритм Deep Q-Learning с модификациями:
+- использован Replay Buffer для обучения на последних данных;
+- использована техника epsilon decay для того, чтобы обеспечить агента случайными действиями в самом начале;
+- использована техника с двумя моделями: обучаемая и целевая модель. Целевая модель служит для оценки значения следующих состояний.
+
+Также реализовано версионирование моделей (папка models текущего репозитория) с автоинкрементом номера модели. В каждой версии содержится два файла: 
+- weights.dat - веса модели
+- info.yml - информация по процессу обучения (количество итераций, гиперпараметры)
+
 параметры обучения:
 
-GAMMA - коэффициент гамма
-
-ALPHA - коэффициент альфа
-
-OBJECTIVE - цель reward, которую необходимо достичь
-
-TEST_EPISODES - количество эпизод, проигрываемых для валидации
-
-SAVE_DIR - каталог для сохранения моделей
+MODEL_DIR - каталог для сохранения моделей
 
 VERBOSE - флаг для включения логгирования в консоль
 
 параметры пробной игры:
 
-SAVE_DIR - каталог для сохранения моделей
+MODEL_DIR - каталог из которой читаются модели
 
 VERSION - версия (по умолчанию последняя)
 
@@ -55,8 +57,8 @@ VIDEO - каталог для сохранения видео
 Пример запуска:
 
 ```
-python demo.py train -g 0.99 -a 0.7 -s models --verbose
+python train.py --model-dir models --verbose
 ```
 ```
-python demo.py play -s models --video videos
+python demo.py --model-dir models --video videos
 ```
