@@ -26,7 +26,7 @@ class ExplainerTransformer(nn.Module):
 
         self.embedding = nn.Embedding(tgt_vocab_size, d_hidden)
 
-        self.pe = PositionalEncoder(d_state, dropout, max_len)
+        self.pe = PositionalEncoder(d_hidden, dropout, max_len)
 
         self.encoder = StateEncoder(
             d_state,

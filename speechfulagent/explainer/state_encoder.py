@@ -89,10 +89,12 @@ class TailMultiheadAttention(nn.Module):
         self.linear_out = nn.Linear(d_hidden, d_hidden, bias=bias)
 
     def forward(self, tail: torch.Tensor, sequence: torch.Tensor):
-        tail_attn, _ = self.attn1(self.linear1(tail))
+        tail_lin = self.linear1(tail)
+        tail_attn, _ = self.attn1(tail_lin, tail_lin, tail_lin)
         tail = self.norm1(tail + tail_attn)
 
-        sequence_attn, _ = self.attn2(self.linear2(sequence))
+        sequence_lin = self.linear2(sequence)
+        sequence_attn, _ = self.attn2(sequence_lin, sequence_lin, sequence_lin)
         sequence = self.norm2(sequence + sequence_attn)
 
         attn_sum = tail + sequence
