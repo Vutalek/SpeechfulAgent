@@ -12,9 +12,10 @@ tgt = torch.zeros((1, 1), dtype=torch.int32)
 inst.eval()
 with torch.no_grad():
     result = inst(tail, sequence, tgt)[0, -1, :]
-    next_token_probs, _ = F.softmax(result).sort(descending=True)
-    print(next_token_probs.shape)
+    next_token_probs, _ = F.softmax(result, dim=0).sort(descending=True)
     print(next_token_probs)
+    print(next_token_probs.shape)
+    print(next_token_probs.sum())
 inst.train()
 result = inst(tail, sequence, tgt)
 loss = 500 - result.sum()
