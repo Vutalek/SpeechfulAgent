@@ -32,7 +32,6 @@ class ExplainerTransformer(nn.Module):
             d_state,
             d_hidden,
             nhead,
-            self.pe,
             dim_feedforward,
             dropout=dropout,
             batch_first=batch_first,

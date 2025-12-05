@@ -12,23 +12,24 @@ class StateEncoder(nn.Module):
             d_state: int,
             d_hidden: int,
             nhead: int, 
-            pos_encoder: PositionalEncoder,
             dim_feedforward: int=2048,
             dropout: float=0.1,
             batch_first: bool=False,
             bias: bool=True
     ):
         super().__init__()
+        assert(d_hidden % 2 == 0)
         self.d_hidden = d_hidden
-        self.pe = pos_encoder
+        self.d_hidden_half = int(d_hidden / 2)
+        self.pe = PositionalEncoder(self.d_hidden_half)
 
         self.activation = nn.ReLU()
 
-        self.resize_tail = nn.Linear(d_state, d_hidden, bias=bias)
-        self.resize_sequence = nn.Linear(d_state, d_hidden, bias=bias)
+        self.resize_tail = nn.Linear(d_state, self.d_hidden_half, bias=bias)
+        self.resize_sequence = nn.Linear(d_state, self.d_hidden_half, bias=bias)
 
         self.attn = TailMultiheadAttention(
-            d_hidden,
+            self.d_hidden_half,
             nhead,
             batch_first=batch_first,
             bias=bias
@@ -60,33 +61,33 @@ class StateEncoder(nn.Module):
 class TailMultiheadAttention(nn.Module):
     def __init__(
             self,
-            d_hidden: int,
+            d_hidden_half: int,
             nhead: int,
             batch_first: bool=False,
             bias: bool=True
     ):
         super().__init__()
-        self.linear1 = nn.Linear(d_hidden, d_hidden, bias=bias)
+        self.linear1 = nn.Linear(d_hidden_half, d_hidden_half, bias=bias)
 
-        self.linear2 = nn.Linear(d_hidden, d_hidden, bias=bias)
+        self.linear2 = nn.Linear(d_hidden_half, d_hidden_half, bias=bias)
 
         self.attn1 = nn.MultiheadAttention(
-            d_hidden,
+            d_hidden_half,
             nhead,
             batch_first=batch_first,
             bias=bias
         )
-        self.norm1 = nn.LayerNorm(d_hidden, bias=bias)
+        self.norm1 = nn.LayerNorm(d_hidden_half, bias=bias)
 
         self.attn2 = nn.MultiheadAttention(
-            d_hidden,
+            d_hidden_half,
             nhead,
             batch_first=batch_first,
             bias=bias
         )
-        self.norm2 = nn.LayerNorm(d_hidden, bias=bias)
+        self.norm2 = nn.LayerNorm(d_hidden_half, bias=bias)
 
-        self.linear_out = nn.Linear(d_hidden, d_hidden, bias=bias)
+        self.linear_out = nn.Linear(2 * d_hidden_half, 2 * d_hidden_half, bias=bias)
 
     def forward(self, tail: torch.Tensor, sequence: torch.Tensor):
         tail_lin = self.linear1(tail)
@@ -97,8 +98,8 @@ class TailMultiheadAttention(nn.Module):
         sequence_attn, _ = self.attn2(sequence_lin, sequence_lin, sequence_lin)
         sequence = self.norm2(sequence + sequence_attn)
 
-        attn_sum = tail + sequence
-        return self.linear_out(attn_sum)
+        concat_attn = torch.concat([tail, sequence], dim=-1)
+        return self.linear_out(concat_attn)
 
 
 class FeedForward(nn.Module):
