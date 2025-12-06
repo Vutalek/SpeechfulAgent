@@ -17,7 +17,7 @@ def generate_dataset(env: gym.Env, agent: Agent, length: int, n: int, save_path:
         seq, frames, total_reward = trace_agent(env, agent)
         if logger:
             logger.info(f"Total reward in {i}: {total_reward}")
-        for j, (exp, frame) in enumerate(zip(list(seq.buffer), frames)):
+        for j, (exp, frame) in enumerate(zip(list(seq.buffer) + [Experience(-1, -1, -1, -1, True)], frames)):
             img = make_image(exp, frame)
             if not os.path.exists(os.path.join(save_path, str(i))):
                 os.mkdir(os.path.join(save_path, str(i)))

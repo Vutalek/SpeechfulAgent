@@ -11,6 +11,8 @@ class Experience:
     next_state: State
     done: bool
 
+    dict = asdict
+
 @dataclass
 class EnvInfo:
     name: str

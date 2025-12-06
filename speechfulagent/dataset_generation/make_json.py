@@ -9,7 +9,7 @@ def make_json(dataset: List[List[Experience]], tails_length: List[int]) -> str:
     data = [
         {
             "id": i,
-            "sequence": [asdict(exp) for exp in seq],
+            "sequence": [exp.dict() for exp in seq],
             "tail": tail,
             "explanation": []
         }
