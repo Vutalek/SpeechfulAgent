@@ -16,7 +16,7 @@ with torch.no_grad():
     result = inst(tail, sequence, tgt)[0, -1, :]
     next_token_probs, _ = F.softmax(result, dim=0).sort(descending=True)
     assert(next_token_probs.shape == (1000,))
-    assert(next_token_probs.sum() == 1.0)
+    assert(next_token_probs.sum().item() == 1.0)
 print("forward работает!")
 
 print("Тестирование backward...")
