@@ -30,6 +30,9 @@ class Tokenizer:
         tokens_vocab = {token: all_tokens.index(token) + 4 for token in all_tokens}
         self.vocab = {**self.vocab, **tokens_vocab}
         self.inverse_vocab = {v: k for k, v in self.vocab.items()}
+
+    def vocab_size(self):
+        return len(self.vocab.keys())
     
     def encode(self, text: str, max_length: int) -> List[int]:
         tokens = [self.special_tokens["<BOS>"]]
