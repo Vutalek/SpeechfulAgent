@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from speechfulagent.explainer.model import ExplainerTransformer
+from speechfulagent.explainer.transformer.model import ExplainerTransformer
 
 
 inst = ExplainerTransformer(37, 1000, batch_first=True)
