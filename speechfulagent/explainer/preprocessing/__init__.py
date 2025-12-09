@@ -1,1 +1,1 @@
-from sequence_embed import embed_sequence
+from .sequence_embed import embed_sequence
