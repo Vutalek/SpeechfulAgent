@@ -31,6 +31,10 @@ class Tokenizer:
         self.vocab = {**self.vocab, **tokens_vocab}
         self.inverse_vocab = {v: k for k, v in self.vocab.items()}
 
+    def set_vocab(self, vocab: Dict[str, int]):
+        self.vocab = vocab
+        self.inverse_vocab = {v: k for k, v in self.vocab.items()}
+
     def vocab_size(self):
         return len(self.vocab.keys())
     
