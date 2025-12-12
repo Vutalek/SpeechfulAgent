@@ -41,5 +41,5 @@ class SequenceExplanationsDataset(Dataset):
     
     def __getitem__(self, index) -> Any:
         explanation = random.choice(range(len(self.explanations[index])))
-        return self.sequences[index], self.tails[index], torch.Tensor(self.explanations[index][explanation])
+        return self.sequences[index], self.tails[index], torch.LongTensor(self.explanations[index][explanation])
     
