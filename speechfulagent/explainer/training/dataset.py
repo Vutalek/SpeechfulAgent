@@ -1,6 +1,6 @@
 import json
 import random
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from torch.utils.data import Dataset
@@ -10,7 +10,13 @@ from speechfulagent.explainer.preprocessing import Tokenizer, embed_sequence
 
 
 class SequenceExplanationsDataset(Dataset):
-    def __init__(self, pathfile: str, max_length: int, tokenizer: Tokenizer = None, seed: int = 7070):
+    def __init__(
+            self, 
+            pathfile: str, 
+            max_length: int, 
+            tokenizer: Optional[Tokenizer] = None, 
+            seed: int = 7070
+    ):
         random.seed(seed)
         with open(pathfile, "rt") as f:
             self.raw_data = json.load(f)
@@ -43,6 +49,9 @@ class SequenceExplanationsDataset(Dataset):
         return len(self.raw_data)
     
     def __getitem__(self, index) -> Any:
-        explanation = random.choice(range(len(self.explanations[index])))
-        return self.sequences[index], self.tails[index], torch.LongTensor(self.explanations[index][explanation])
+        if self.explanations[index]:
+            explanation = random.choice(range(len(self.explanations[index])))
+            return self.sequences[index], self.tails[index], torch.LongTensor(self.explanations[index][explanation])
+        else:
+            return self.sequences[index], self.tails[index], None
     

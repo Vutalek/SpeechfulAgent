@@ -26,11 +26,11 @@ class Explainer:
     
     def _greedy_sampling(self, logits: torch.Tensor) -> int:
         val, ind = torch.max(logits, dim=0)
-        return ind.item()
+        return int(ind.item())
     
     def _random_sampling(self, logits: torch.Tensor) -> int:
         probs = torch.softmax(logits, dim=-1)
-        return torch.multinomial(probs, 1).item()
+        return int(torch.multinomial(probs, 1).item())
     
     def generate(
             self,
