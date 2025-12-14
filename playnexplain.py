@@ -28,6 +28,7 @@ if __name__ == "__main__":
     explainer = Explainer(tokenizer, model)
     seq, tail, expl = dataset[0]
 
+    print(f"Количество объясняемых действий: {dataset.raw_data[0]['tail']+1}")
     for _ in range(10):
         result = explainer.generate(tail.unsqueeze(0), seq.unsqueeze(0), temperature=1.2, top_k=20)
         print(result)
