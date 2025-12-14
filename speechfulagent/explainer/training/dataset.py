@@ -10,7 +10,7 @@ from speechfulagent.explainer.preprocessing import Tokenizer, embed_sequence
 
 
 class SequenceExplanationsDataset(Dataset):
-    def __init__(self, pathfile: str, max_length: int, seed: int):
+    def __init__(self, pathfile: str, max_length: int, tokenizer: Tokenizer = None, seed: int = 7070):
         random.seed(seed)
         with open(pathfile, "rt") as f:
             self.raw_data = json.load(f)
@@ -18,11 +18,14 @@ class SequenceExplanationsDataset(Dataset):
             experiences = [Experience(**exp) for exp in sample["sequence"]]
             sample["sequence"] = experiences
 
-        self.tokenizer = Tokenizer()
-        corpus = []
-        for sample in self.raw_data:
-            corpus.extend(sample["explanation"])
-        self.tokenizer.build_vocab(corpus)
+        if not tokenizer:
+            self.tokenizer = Tokenizer()
+            corpus = []
+            for sample in self.raw_data:
+                corpus.extend(sample["explanation"])
+            self.tokenizer.build_vocab(corpus)
+        else:
+            self.tokenizer = tokenizer
         self.max_length = max_length
 
         self.sequences = []
