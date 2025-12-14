@@ -13,13 +13,13 @@ if __name__ == "__main__":
     agent = Agent()
     agent.load_model("models", "latest")
 
-    generate_dataset(env, agent, 10, 1, "testing/1")
+    generate_dataset(env, agent, 10, 1, "testing/10")
 
     model_info = torch.load("models/explainer.pth")
     tokenizer = Tokenizer()
     tokenizer.set_vocab(model_info["tokenizer_vocab"])
 
-    dataset = SequenceExplanationsDataset("testing/1/data.json", 32, tokenizer, seed=777)
+    dataset = SequenceExplanationsDataset("testing/10/data.json", 32, tokenizer, seed=777)
 
     model = ExplainerTransformer(37, tokenizer.vocab_size(), batch_first=True)
     model.load_state_dict(model_info["model_state_dict"])
