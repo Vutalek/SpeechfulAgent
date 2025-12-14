@@ -28,7 +28,7 @@ def train(
 
     times = []
     print("======= START OF TRAINING =======")
-    for epoch in range(max_iter):
+    for epoch in range(1, max_iter+1):
         model.train()
         epoch_loss = 0.0
         t1 = time.time()
