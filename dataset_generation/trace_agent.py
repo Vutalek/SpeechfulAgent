@@ -3,7 +3,7 @@ from typing import Tuple, List, Any
 import gymnasium as gym
 
 from speechfulagent.agent import Agent
-from speechfulagent.train.replay_buffer import ReplayBuffer
+from speechfulagent.train.agent.replay_buffer import ReplayBuffer
 
 
 def trace_agent(env: gym.Env, agent: Agent) -> Tuple[ReplayBuffer, List[Any], float]:
