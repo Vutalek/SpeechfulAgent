@@ -40,7 +40,7 @@ class ExplainerTrainer:
 
         self.model = ExplainerTransformer(
             d_state,
-            len(self.tokenizer.vocab.keys()),
+            self.tokenizer.vocab_size(),
             d_hidden,
             nhead,
             num_decoder_layers,

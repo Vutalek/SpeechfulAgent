@@ -16,7 +16,7 @@ class Experience:
 @dataclass
 class EnvInfo:
     name: str
-    n_observatons: int
+    n_observations: int
     n_actions: int
     
     dict = asdict

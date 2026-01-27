@@ -17,8 +17,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     trainer = ExplainerTrainer(
-        args.dataset_dir,
-        37
+        pathfile=args.dataset_dir,
+        d_state=37,
+        d_hidden=128,
+        nhead=4,
+        dim_feedforward=512,
+        num_decoder_layers=2,
+        max_iter=350,
+        info_every_epoch=10,
+        batch_first=True
     )
     tokenizer, history, explainer, train_info = trainer.train()
     logger.info("saving model")

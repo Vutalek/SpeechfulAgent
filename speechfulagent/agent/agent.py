@@ -84,5 +84,5 @@ class Agent(VersioningMixin):
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
         state_dict = torch.load(path + '/' + "weights.dat")
-        self.net = DQN(data["environment"]["input_shape"], data["environment"]["n_actions"])
+        self.net = DQN(data["environment"]["n_observations"], data["environment"]["n_actions"])
         self.net.load_state_dict(state_dict)

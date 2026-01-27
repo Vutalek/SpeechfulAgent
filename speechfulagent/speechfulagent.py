@@ -58,11 +58,11 @@ class SpeechfulAgent:
             exp = self.agent.step(self.env)
             self.episode.append(exp)
             if i % self.frequency == 0:
-                tail = random.randint(0, self.max_sequence_length-1)
+                tail = random.randint(1, self.max_sequence_length)
                 seq_embed, tail_embed = embed_sequence(self.episode[-self.max_sequence_length:], tail, self.max_sequence_length)
                 explanation = self.explainer.generate(
-                    tail_embed,
-                    seq_embed,
+                    tail_embed.unsqueeze(0),
+                    seq_embed.unsqueeze(0),
                     self.max_tokens,
                     self.temperature,
                     self.top_k

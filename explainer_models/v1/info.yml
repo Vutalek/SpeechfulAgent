@@ -1,0 +1,19 @@
+version: v1
+n_params: 1100723
+hyperparameters:
+  d_state: 37
+  tgt_vocab_size: 691
+  d_hidden: 128
+  nhead: 4
+  num_decoder_layers: 2
+  dim_feedforward: 512
+  max_len: 500
+  dropout: 0.1
+  batch_first: true
+  bias: true
+training:
+  pathfile: dataset/data.json
+  max_length: 32
+  n_iter: 100
+  batch_size: 4
+  learning_rate: 0.001
