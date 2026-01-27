@@ -12,7 +12,7 @@ class Explainer(VersioningMixin):
         self.tokenizer: Tokenizer = None
         self.transformer: ExplainerTransformer = None
 
-    def _apply_top_k(self, logits: torch.Tensor, k: int = 0) -> torch.Tensor:
+    def _apply_top_k(self, logits: torch.Tensor, k: int=0) -> torch.Tensor:
         if k == 0:
             return logits
         top_logits, top_ids = torch.topk(logits, k, dim=-1)
@@ -32,12 +32,12 @@ class Explainer(VersioningMixin):
         return int(torch.multinomial(probs, 1).item())
     
     def generate(
-            self,
-            tail: torch.Tensor,
-            sequence: torch.Tensor,
-            max_length: int = 32,
-            temperature: float = 0.0,
-            top_k: int = 0
+        self,
+        tail: torch.Tensor,
+        sequence: torch.Tensor,
+        max_length: int=32,
+        temperature: float=0.0,
+        top_k: int=0
     ) -> str:
         if self.tokenizer is None or self.transformer is None:
             raise RuntimeError("Model not loaded!")
@@ -66,7 +66,7 @@ class Explainer(VersioningMixin):
                 "model_state_dict": self.transformer.state_dict(),
                 "tokenizer_vocab": self.tokenizer.vocab
             },
-            path + "/weights.dat"
+            path + '/' + "weights.dat"
         )
         train: ExplainerTrainInfo = kwargs.get("train")
         info = {

@@ -3,7 +3,6 @@ from typing import Dict, Any
 import numpy as np
 import torch
 import gymnasium as gym
-from yamlmaker import generate
 
 from speechfulagent.types import *
 from speechfulagent.dataclasses import *
@@ -72,7 +71,7 @@ class Agent(VersioningMixin):
         return exp
     
     def _save_model(self, path: str, version: str, *args, **kwargs) -> Dict[str, Any]:
-        torch.save(self.net.state_dict(), path + '/weights.dat')
+        torch.save(self.net.state_dict(), path + '/' + 'weights.dat')
         env: EnvInfo = kwargs.get("env")
         train: AgentTrainInfo = kwargs.get("train")
         info = {
@@ -84,10 +83,6 @@ class Agent(VersioningMixin):
         return info
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
-        state_dict = torch.load(
-            path + '/' + "weights.dat",
-            map_location=lambda stg, _: stg,
-            weights_only=True
-        )
+        state_dict = torch.load(path + '/' + "weights.dat")
         self.net = DQN(data["environment"]["input_shape"], data["environment"]["n_actions"])
         self.net.load_state_dict(state_dict)
