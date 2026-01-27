@@ -9,6 +9,7 @@ from torch.nn import CrossEntropyLoss
 from .dataset import SequenceExplanationsDataset
 from speechfulagent.explainer.preprocessing import Tokenizer
 from speechfulagent.explainer.transformer import ExplainerTransformer
+from speechfulagent.explainer import Explainer
 from speechfulagent.dataclasses import *
 
 class ExplainerTrainer:
@@ -16,7 +17,6 @@ class ExplainerTrainer:
         self,
         pathfile: str,
         d_state: int,
-        tgt_vocab_size: int,
         d_hidden: int=512,
         nhead: int=8,
         num_decoder_layers: int=6,
@@ -29,7 +29,7 @@ class ExplainerTrainer:
         batch_size: int=4,
         max_length: int=32,
         max_iter: int=10,
-        info_every_epoch: int=10,
+        info_every_epoch: int=2,
         seed: int=7070
     ):
         self.pathfile = pathfile
@@ -40,7 +40,7 @@ class ExplainerTrainer:
 
         self.model = ExplainerTransformer(
             d_state,
-            tgt_vocab_size,
+            len(self.tokenizer.vocab.keys()),
             d_hidden,
             nhead,
             num_decoder_layers,
@@ -61,7 +61,7 @@ class ExplainerTrainer:
         self.max_iter = max_iter
         self.info_every_epoch = info_every_epoch
 
-    def train(self) -> Tuple[Tokenizer, List[float], ExplainerTransformer, ExplainerTrainInfo]:
+    def train(self) -> Tuple[Tokenizer, List[float], Explainer, ExplainerTrainInfo]:
         times = []
         print("======= START OF TRAINING =======")
         for epoch in range(1, self.max_iter+1):
@@ -93,4 +93,7 @@ class ExplainerTrainer:
             self.batch_size,
             self.learning_rate
         )
-        return self.tokenizer, self.train_loss_history, self.model, train_info
+        explainer = Explainer()
+        explainer.tokenizer = self.tokenizer
+        explainer.transformer = self.model
+        return self.tokenizer, self.train_loss_history, explainer, train_info

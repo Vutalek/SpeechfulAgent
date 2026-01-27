@@ -5,7 +5,7 @@ logger = logging.getLogger("train")
 
 import gymnasium as gym
 
-from speechfulagent import Agent, Trainer
+from speechfulagent import AgentTrainer
 
 ENVIRONMENT = "FrozenLake-v1"
 
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     env = gym.make(ENVIRONMENT, is_slippery=True)
-    trainer = Trainer(
+    trainer = AgentTrainer(
         env=env,
         objective=1,
         gamma=0.9,
@@ -36,4 +36,4 @@ if __name__ == "__main__":
     logger.info("start training")
     agent, env_info, train_info = trainer.train()
     logger.info("saving model")
-    agent.save_model(args.model_dir, env_info, train_info)
+    agent.save_model(args.model_dir, env=env_info, train=train_info)

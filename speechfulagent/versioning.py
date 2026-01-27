@@ -60,6 +60,7 @@ class VersioningMixin(ABC):
         os.mkdir(path)
         info = self._save_model(path, version, *args, **kwargs)
         generate(info, path + '/' + "info")
+        self.version = version
 
 
     @abstractmethod
