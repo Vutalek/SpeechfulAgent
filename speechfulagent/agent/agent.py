@@ -1,9 +1,8 @@
-import os
+from typing import Dict, Any
 
 import numpy as np
 import torch
 import gymnasium as gym
-import yaml
 from yamlmaker import generate
 
 from speechfulagent.types import *
@@ -13,17 +12,20 @@ from .net import DQN
 
 
 class Agent(VersioningMixin):
+    """DQN agent. Only works in environments with both discrete action
+    and observation spaces."""
     def __init__(self):
         self.env_state = None
         self.total_reward = 0.0
         self.net = None
-        self.version = None
 
     def reset(self):
+        # resets the state and total reward of agent
         self.env_state = None
         self.total_reward = 0.0
 
     def init_state(self, state: State):
+        # initializes first state
         self.env_state = state
 
     def _ohe(self, x, size):
@@ -33,7 +35,17 @@ class Agent(VersioningMixin):
     
     @torch.no_grad()
     def step(self, env: gym.Env, epsilon: float = 0.0) -> Experience:
-        self.get_version()
+        """Agent's step in environment.
+
+        Firstly, agent must be initialized with init_state() method.
+        """
+        # checking if model is loaded
+        if self.net is None:
+            raise RuntimeError("Model not loaded!")
+        # checking if state is not None
+        if self.env_state is None:
+            raise RuntimeError("Uninitialized environment!")
+        # randomness
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
@@ -59,18 +71,10 @@ class Agent(VersioningMixin):
         )
         return exp
     
-    def get_version(self) -> str | None:
-        """Returns current version of agent's model"""
-        if self.version is not None:
-            return self.version
-        else:
-            raise RuntimeError("Model not loaded!")
-    
-    def save_model(self, dir: str, env: EnvInfo, train: TrainInfo):
-        version = self.get_next_version(dir)
-        path = dir + '/' + version
-        os.mkdir(path)
+    def _save_model(self, path: str, version: str, *args, **kwargs):
         torch.save(self.net.state_dict(), path + '/weights.dat')
+        env: EnvInfo = kwargs.get("env")
+        train: AgentTrainInfo = kwargs.get("train")
         info = {
             "version": version,
             "n_params": sum(p.numel() for p in self.net.parameters()),
@@ -79,19 +83,9 @@ class Agent(VersioningMixin):
         }
         generate(info, path + "/info")
 
-    def load_model(self, dir: str, version = "latest"):
-        known = self.known_versions(dir)
-        if version == "latest":
-            version = self.get_latest(dir)
-        if version not in known:
-            raise RuntimeError("Unknown version!")
-        self.version = version
-
-        with open(dir + '/' + version + '/' + "info.yml", "rt") as f:
-            data = yaml.safe_load(f)
-
+    def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
         state_dict = torch.load(
-            dir + '/' + version + '/' + "weights.dat",
+            path + '/' + "weights.dat",
             map_location=lambda stg, _: stg,
             weights_only=True
         )
