@@ -1,17 +1,16 @@
+from typing import Any, Dict
 import torch
 
 from .preprocessing import Tokenizer
 from .transformer import ExplainerTransformer
+from speechfulagent.dataclasses import *
+from speechfulagent.versioning import VersioningMixin
 
 
-class Explainer:
-    def __init__(
-            self,
-            tokenizer: Tokenizer,
-            transformer: ExplainerTransformer
-    ):
-        self.tokenizer = tokenizer
-        self.transformer = transformer
+class Explainer(VersioningMixin):
+    def __init__(self):
+        self.tokenizer: Tokenizer = None
+        self.transformer: ExplainerTransformer = None
 
     def _apply_top_k(self, logits: torch.Tensor, k: int = 0) -> torch.Tensor:
         if k == 0:
@@ -40,6 +39,9 @@ class Explainer:
             temperature: float = 0.0,
             top_k: int = 0
     ) -> str:
+        if self.tokenizer is None or self.transformer is None:
+            raise RuntimeError("Model not loaded!")
+        
         tokens = torch.IntTensor([[self.tokenizer.special_tokens["<BOS>"]]])
         for _ in range(max_length):
             with torch.no_grad():
@@ -57,3 +59,27 @@ class Explainer:
                 if next_token == self.tokenizer.special_tokens["<EOS>"]:
                     break
         return self.tokenizer.decode(tokens[0, :].tolist())
+    
+    def _save_model(self, path: str, version: str, *args, **kwargs):
+        torch.save(
+            {
+                "model_state_dict": self.transformer.state_dict(),
+                "tokenizer_vocab": self.tokenizer.vocab
+            },
+            path + "/weights.dat"
+        )
+        train: ExplainerTrainInfo = kwargs.get("train")
+        info = {
+            "version": version,
+            "n_params": sum(p.numel() for p in self.transformer.parameters()),
+            "hyperparameters": self.transformer.hyperparameters,
+            "training": train.dict()
+        }
+        return info
+
+    def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
+        params = torch.load(path + '/' + "weights.dat")
+        self.tokenizer = Tokenizer()
+        self.tokenizer.set_vocab(params["tokenizer_vocab"])
+        self.transformer = ExplainerTransformer(**(data["hyperparameters"]))
+        self.transformer.load_state_dict(params["model_state_dict"])

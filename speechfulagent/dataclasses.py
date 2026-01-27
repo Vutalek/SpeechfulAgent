@@ -16,17 +16,17 @@ class Experience:
 @dataclass
 class EnvInfo:
     name: str
-    input_shape: int
+    n_observatons: int
     n_actions: int
     
     dict = asdict
 
 @dataclass
-class TrainInfo:
+class AgentTrainInfo:
     # iterations count
     n_iter: int
     # objective bound
-    mean_default_bound: float
+    mean_objective: float
     # gamma
     gamma: float
     # replay buffer
@@ -41,5 +41,17 @@ class TrainInfo:
     epsilon_decay_last_frame: int
     epsilon_decay_start: float
     epsilon_decay_final: float
+    #early stopping
+    early_stopping_steps: int
+
+    dict = asdict
+
+@dataclass
+class ExplainerTrainInfo:
+    # iterations count
+    n_iter: int
+    # optimization
+    batch_size: int
+    learning_rate: float
 
     dict = asdict

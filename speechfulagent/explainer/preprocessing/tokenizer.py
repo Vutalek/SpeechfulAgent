@@ -2,7 +2,8 @@ from typing import List, Dict
 
 
 class Tokenizer:
-    def __init__(self):
+    """Tokenizer for text."""
+    def __init__(self, pre_tokenizer=None):
         self.vocab = {}
         self.special_tokens = {
             "<UNK>": 0, 
@@ -11,11 +12,15 @@ class Tokenizer:
             "<EOS>": 3
         }
         self.inverse_vocab = {}
+        if pre_tokenizer is None:
+            self.pre_tokenizer = lambda text: text.lower().split()
 
     def pre_tokenize(self, text: str) -> List[str]:
-        return text.lower().split()
+        """Initial tokenization of text"""
+        return self.pre_tokenizer(text)
 
     def build_vocab(self, corpus: List[str]) -> None:
+        """Builds vocabulary and inverse vocabulary from corpus"""
         self.vocab = {
             "<UNK>": 0, 
             "<PAD>": 1,
@@ -32,13 +37,16 @@ class Tokenizer:
         self.inverse_vocab = {v: k for k, v in self.vocab.items()}
 
     def set_vocab(self, vocab: Dict[str, int]):
+        """Loads external vocab into tokenizer."""
         self.vocab = vocab
         self.inverse_vocab = {v: k for k, v in self.vocab.items()}
 
     def vocab_size(self):
+        """Gets the size of vocabulary."""
         return len(self.vocab.keys())
     
     def encode(self, text: str, max_length: int) -> List[int]:
+        """Encodes input text with vocabulary into list of integers (tokens)"""
         tokens = [self.special_tokens["<BOS>"]]
         pre = self.pre_tokenize(text)
         for tok in pre:
@@ -56,6 +64,10 @@ class Tokenizer:
         return tokens
 
     def decode(self, tokens: List[int]) -> str:
+        """Decodes list of integers (tokens) into text.
+
+        Text representation of tokens simply concatenated with spaces.
+        """
         text = [self.inverse_vocab[tok] for tok in tokens]
         if self.special_tokens["<PAD>"] in tokens:
             pad_index = text.index("<PAD>")

@@ -11,17 +11,29 @@ class ExplainerTransformer(nn.Module):
     def __init__(
             self,
             d_state: int,
-            tgt_vocab_size:int,
+            tgt_vocab_size: int,
             d_hidden: int=512,
             nhead: int=8,
-            num_decoder_layers:int=6,
+            num_decoder_layers: int=6,
             dim_feedforward: int=2048,
-            max_len=500,
+            max_len: int=500,
             dropout: float=0.1,
             batch_first: bool=False,
             bias: bool=True
     ):
         super().__init__()
+        self.hyperparameters = {
+            "d_state": d_state,
+            "tgt_vocab_size": tgt_vocab_size,
+            "d_hidden": d_hidden,
+            "nhead": nhead,
+            "num_decoder_layers": num_decoder_layers,
+            "dim_feedforward": dim_feedforward,
+            "max_len": max_len,
+            "dropout": dropout,
+            "batch_first": batch_first,
+            "bias": bias
+        }
         self.d_hidden = d_hidden
 
         self.embedding = nn.Embedding(tgt_vocab_size, d_hidden)
