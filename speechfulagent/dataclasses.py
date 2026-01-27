@@ -37,7 +37,7 @@ class TrainInfo:
     learning_rate: float
     # target network
     sync_target_frames: int
-    # epsilon decayt
+    # epsilon decay
     epsilon_decay_last_frame: int
     epsilon_decay_start: float
     epsilon_decay_final: float
