@@ -5,7 +5,7 @@ logger = logging.getLogger("demo")
 
 import gymnasium as gym
 
-from speechfulagent import Agent, play
+from speechfulagent import SpeechfulAgent
 
 
 ENVIRONMENT = "FrozenLake-v1"
@@ -13,8 +13,10 @@ ENVIRONMENT = "FrozenLake-v1"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--model-dir", default=".")
-    parser.add_argument("--version", default="latest")
+    parser.add_argument("--agent-dir", default=".")
+    parser.add_argument("--agent_version", default="latest")
+    parser.add_argument("--explainer-dir", default=".")
+    parser.add_argument("--explainer_version", default="latest")
 
     parser.add_argument("--video", default="videos")
 
@@ -22,9 +24,15 @@ if __name__ == "__main__":
 
     env = gym.make(ENVIRONMENT, render_mode="rgb_array")
     env = gym.wrappers.RecordVideo(env, video_folder=args.video, name_prefix=args.version)
-    agent = Agent()
-    agent.load_model(args.model_dir, args.version)
-    logger.info(f"model version: {agent.get_version()}")
-    play(env, agent)
+    agent = SpeechfulAgent(
+        agent_dir=args.agent_dir,
+        explainer_dir=args.explainer_dir,
+        agent_version=args.agent_version,
+        explainer_version=args.explainer_version
+    )
+    logger.info(f"agent version: {agent.agent.get_version()}")
+    logger.info(f"explainer version: {agent.explainer.get_version()}")
+    agent.set_environment(env)
+    _, _, reward = agent.run()
     env.close()
-    logger.info(f"Total reward: {agent.total_reward}")
+    logger.info(f"Total reward: {reward}")
