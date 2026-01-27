@@ -1,4 +1,4 @@
-import typing as tt
+from typing import List, Tuple
 
 import numpy as np
 import torch
@@ -13,22 +13,22 @@ from speechfulagent.agent import Agent, DQN
 from speechfulagent.dataclasses import *
 
 
-class Trainer:
+class AgentTrainer:
     def __init__(
-            self,
-            env: gym.Env,
-            objective: float,
-            gamma: float,
-            replay_buffer_size: int,
-            replay_buffer_start_size: int,
-            batch_size: int,
-            learning_rate: float,
-            sync_target_frames: int,
-            epsilon_decay_last_frame: int,
-            epsilon_decay_start: float,
-            epsilon_decay_final: float,
-            logger = None
-        ):
+        self,
+        env: gym.Env,
+        objective: float,
+        gamma: float,
+        replay_buffer_size: int,
+        replay_buffer_start_size: int,
+        batch_size: int,
+        learning_rate: float,
+        sync_target_frames: int,
+        epsilon_decay_last_frame: int,
+        epsilon_decay_start: float,
+        epsilon_decay_final: float,
+        logger = None
+    ):
         self.env = RewardWrapper(env)
 
         self.objective = objective
@@ -53,12 +53,11 @@ class Trainer:
 
         self.agent = Agent()
         self.agent.net = self.train_net
-        self.agent.version = "training"
     
     def _batch_to_tensors(
-            self, 
-            batch: tt.List[Experience]
-            ) -> tt.Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        self, 
+        batch: List[Experience]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         states, actions, rewards, next_states, dones = [], [], [], [], []
         for e in batch:
             states.append(e.state)
@@ -73,7 +72,7 @@ class Trainer:
         dones_t = torch.as_tensor(dones)
         return states_t, actions_t, rewards_t, next_states_t, dones_t
     
-    def _loss(self, batch: tt.List[Experience]) -> torch.Tensor:
+    def _loss(self, batch: List[Experience]) -> torch.Tensor:
         states_t, actions_t, rewards_t, next_states_t, dones_t = self._batch_to_tensors(batch)
         q_values = self.train_net(states_t).gather(
             1, actions_t.unsqueeze(-1)
@@ -86,7 +85,7 @@ class Trainer:
         expected_q_values = next_state_values * self.gamma + rewards_t
         return F.mse_loss(q_values, expected_q_values)
     
-    def train(self) -> tt.Tuple[Agent, EnvInfo, TrainInfo]:
+    def train(self) -> Tuple[Agent, EnvInfo, AgentTrainInfo]:
         n_iter = 0
         total_rewards = []
         epsilon = self.epsilon_decay_start
@@ -142,7 +141,7 @@ class Trainer:
             int(self.env.observation_space.n),
             int(self.env.action_space.n)
         )
-        train_info = TrainInfo(
+        train_info = AgentTrainInfo(
             n_iter,
             self.objective,
             self.gamma,

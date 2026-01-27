@@ -1,5 +1,5 @@
-import typing as tt
 from collections import deque
+from typing import List
 
 import numpy as np
 
@@ -16,6 +16,6 @@ class ReplayBuffer:
     def append(self, experience: Experience):
         self.buffer.append(experience)
 
-    def sample(self, batch_size: int) -> tt.List[Experience]:
+    def sample(self, batch_size: int) -> List[Experience]:
         idxs = np.random.choice(len(self), batch_size, replace=False)
         return [self.buffer[idx] for idx in idxs]

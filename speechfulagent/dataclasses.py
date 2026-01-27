@@ -41,13 +41,14 @@ class AgentTrainInfo:
     epsilon_decay_last_frame: int
     epsilon_decay_start: float
     epsilon_decay_final: float
-    #early stopping
-    early_stopping_steps: int
 
     dict = asdict
 
 @dataclass
 class ExplainerTrainInfo:
+    #dataset
+    pathfile: str
+    max_length: int
     # iterations count
     n_iter: int
     # optimization

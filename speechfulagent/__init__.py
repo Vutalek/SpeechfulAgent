@@ -1,3 +1,4 @@
 from .agent import Agent
-from .train import Trainer
+from .explainer import Explainer
+from .train import AgentTrainer, ExplainerTrainer, SequenceExplanationsDataset
 from .play import play

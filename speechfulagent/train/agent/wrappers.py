@@ -2,8 +2,9 @@ import gymnasium as gym
 
 
 class RewardWrapper(gym.Wrapper):
+    """https://github.com/kondster/DQN-FrozenLake/blob/main/dqn_frozenlake.py"""
     def __init__(self, env):
-        super(RewardWrapper, self).__init__(env)
+        super().__init__(env)
 
     def step(self, action):
         next_state, reward, is_done, is_trunc, info = self.env.step(action)
@@ -13,5 +14,5 @@ class RewardWrapper(gym.Wrapper):
         elif reward == 1:
             reward = 5  # Increased reward for reaching the goal
         else:
-            reward = -5  # Increased penalty for falling into a hole
+            reward = -5  # Increased penalty for falling into a holes
         return next_state, reward, is_done, is_trunc, info

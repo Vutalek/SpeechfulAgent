@@ -11,11 +11,11 @@ from speechfulagent.explainer.preprocessing import Tokenizer, embed_sequence
 
 class SequenceExplanationsDataset(Dataset):
     def __init__(
-            self, 
-            pathfile: str, 
-            max_length: int, 
-            tokenizer: Optional[Tokenizer] = None, 
-            seed: int = 7070
+        self, 
+        pathfile: str, 
+        max_length: int, 
+        tokenizer: Optional[Tokenizer] = None, 
+        seed: int = 7070
     ):
         random.seed(seed)
         with open(pathfile, "rt") as f:
