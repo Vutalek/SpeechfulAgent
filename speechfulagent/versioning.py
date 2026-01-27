@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
 import yaml
+from yamlmaker import generate
 
 
 class VersioningMixin(ABC):
@@ -51,14 +52,18 @@ class VersioningMixin(ABC):
         method _save_model() must be implemented.
 
         _save_model() has path as it's argument, not dir!
+
+        _save_model() must return dictionary with metadata to save!
         """
         version = self.get_next_version(dir)
         path = dir + '/' + version
         os.mkdir(path)
-        self._save_model(path, version, *args, **kwargs)
+        info = self._save_model(path, version, *args, **kwargs)
+        generate(info, path + '/' + "info")
+
 
     @abstractmethod
-    def _save_model(self, path: str, version: str, *args, **kwargs):
+    def _save_model(self, path: str, version: str, *args, **kwargs) -> Dict[str, Any]:
         pass
 
     def load_model(self, dir: str, version: str = "latest", *args, **kwargs):

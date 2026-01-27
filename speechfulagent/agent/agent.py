@@ -71,7 +71,7 @@ class Agent(VersioningMixin):
         )
         return exp
     
-    def _save_model(self, path: str, version: str, *args, **kwargs):
+    def _save_model(self, path: str, version: str, *args, **kwargs) -> Dict[str, Any]:
         torch.save(self.net.state_dict(), path + '/weights.dat')
         env: EnvInfo = kwargs.get("env")
         train: AgentTrainInfo = kwargs.get("train")
@@ -81,7 +81,7 @@ class Agent(VersioningMixin):
             "environment": env.dict(),
             "training": train.dict()
         }
-        generate(info, path + "/info")
+        return info
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
         state_dict = torch.load(
