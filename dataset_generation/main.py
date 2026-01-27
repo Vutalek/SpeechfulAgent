@@ -1,4 +1,3 @@
-import os
 import argparse
 import logging
 logging.basicConfig(level=logging.NOTSET, format="[%(levelname)s]: %(message)s")
@@ -7,7 +6,7 @@ logger = logging.getLogger("demo")
 import gymnasium as gym
 
 from speechfulagent import Agent
-from speechfulagent.dataset_generation import generate_dataset
+from .generate_dataset import generate_dataset
 
 
 ENVIRONMENT = "FrozenLake-v1"
