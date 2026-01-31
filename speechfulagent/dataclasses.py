@@ -29,19 +29,15 @@ class AgentTrainInfo:
     mean_objective: float
     # gamma
     gamma: float
-    # replay buffer
-    replay_buffer_size: int
-    replay_buffer_start_size: int
     # optimization
     batch_size: int
+    n_steps: int
     learning_rate: float
-    # target network
-    sync_target_frames: int
-    # epsilon decay
-    epsilon_decay_last_frame: int
-    epsilon_decay_start: float
-    epsilon_decay_final: float
-
+    # clipping
+    clip_grad: float
+    # asynchronous
+    n_envs: int
+    
     dict = asdict
 
 @dataclass

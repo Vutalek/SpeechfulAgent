@@ -14,13 +14,13 @@ class A2C(nn.Module):
             nn.ReLU()
         )
         
-        self.policy = nn.Sequential(
+        self.actor = nn.Sequential(
             nn.Linear(128, 256),
             nn.ReLU(),
             nn.Linear(256, n_actions)
         )
 
-        self.value = nn.Sequential(
+        self.critic = nn.Sequential(
             nn.Linear(128, 256),
             nn.ReLU(),
             nn.Linear(256, 1)
@@ -28,4 +28,4 @@ class A2C(nn.Module):
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         backbone = self.backbone(x.type(torch.float32))
-        return self.policy(backbone), self.value(backbone)
+        return self.actor(backbone), self.critic(backbone)

@@ -33,7 +33,7 @@ class Agent(VersioningMixin):
         return enc
     
     @torch.no_grad()
-    def step(self, env: gym.Env, epsilon: float = 0.0) -> Experience:
+    def step(self, env: gym.Env) -> Experience:
         """Agent's step in environment.
 
         Firstly, agent must be initialized with init_state() method.
@@ -44,15 +44,13 @@ class Agent(VersioningMixin):
         # checking if state is not None
         if self.env_state is None:
             raise RuntimeError("Uninitialized environment!")
-        # randomness
-        if np.random.random() < epsilon:
-            action = env.action_space.sample()
-        else:
-            state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
-            state_t.unsqueeze_(0)
-            policy, _ = self.net(state_t)
-            probs = torch.softmax(policy, dim=-1)
-            action = int(torch.multinomial(probs, 1).item())
+
+        # state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
+        state_t = torch.as_tensor(self.env_state)
+        state_t.unsqueeze_(0)
+        policy, _ = self.net(state_t)
+        probs = torch.softmax(policy, dim=-1)
+        action = int(torch.multinomial(probs, 1).item())
         
         next_state, reward, is_done, is_trunc, _ = env.step(action)
         self.total_reward += float(reward)

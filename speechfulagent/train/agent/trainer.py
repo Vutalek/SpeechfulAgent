@@ -1,13 +1,12 @@
-from typing import List, Tuple
+from collections import deque
+from typing import Tuple
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.tensorboard.writer import SummaryWriter
+import torch.multiprocessing as mp
 import gymnasium as gym
 
-from .replay_buffer import ReplayBuffer
 from .wrappers import RewardWrapper
 from speechfulagent.agent import Agent, A2C
 from speechfulagent.dataclasses import *
@@ -16,142 +15,193 @@ from speechfulagent.dataclasses import *
 class AgentTrainer:
     def __init__(
         self,
-        env: gym.Env,
+        env: str,
         objective: float,
         gamma: float,
-        replay_buffer_size: int,
-        replay_buffer_start_size: int,
+        entropy_beta: float,
+        clip_grad: float,
+        n_envs: int,
+        n_steps: int,
         batch_size: int,
         learning_rate: float,
-        sync_target_frames: int,
-        epsilon_decay_last_frame: int,
-        epsilon_decay_start: float,
-        epsilon_decay_final: float,
         logger = None
     ):
-        self.env = RewardWrapper(env)
+        self.env = env
+        environ = RewardWrapper(gym.make(env))
+        self.obs_space = environ.observation_space.shape[0]
+        self.act_space = environ.action_space.n
 
         self.objective = objective
 
         self.gamma = gamma
 
-        self.replay_buffer = ReplayBuffer(replay_buffer_size)
-        self.replay_buffer_start_size = replay_buffer_start_size
+        self.entropy_beta = entropy_beta
+        self.clip_grad = clip_grad
 
-        self.train_net = DQN(env.observation_space.n, env.action_space.n)
-        self.target_net = DQN(env.observation_space.n, env.action_space.n)
-        self.sync_target_frames = sync_target_frames
-        self.batch_size = batch_size
+        self.n_envs = n_envs
+        self.pool = []
+
+        self.n_steps = n_steps
+
+        self.train_net = A2C(self.obs_space, self.act_space)
         self.optim = optim.Adam(params=self.train_net.parameters(), lr=learning_rate)
+        self.batch_size = batch_size
         self.learning_rate = learning_rate
-
-        self.epsilon_decay_last_frame = epsilon_decay_last_frame
-        self.epsilon_decay_start = epsilon_decay_start
-        self.epsilon_decay_final = epsilon_decay_final
 
         self.logger = logger
 
         self.agent = Agent()
         self.agent.net = self.train_net
     
-    def _batch_to_tensors(
-        self, 
-        batch: List[Experience]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        states, actions, rewards, next_states, dones = [], [], [], [], []
-        for e in batch:
-            states.append(e.state)
-            actions.append(e.action)
-            rewards.append(e.reward)
-            next_states.append(e.next_state)
-            dones.append(e.done)
-        states_t = F.one_hot(torch.as_tensor(states), self.env.observation_space.n)
-        actions_t = torch.as_tensor(actions)
-        rewards_t = torch.as_tensor(rewards)
-        next_states_t = F.one_hot(torch.as_tensor(next_states), self.env.observation_space.n)
-        dones_t = torch.as_tensor(dones)
-        return states_t, actions_t, rewards_t, next_states_t, dones_t
-    
-    def _loss(self, batch: List[Experience]) -> torch.Tensor:
-        states_t, actions_t, rewards_t, next_states_t, dones_t = self._batch_to_tensors(batch)
-        q_values = self.train_net(states_t).gather(
-            1, actions_t.unsqueeze(-1)
-        ).squeeze(-1)
-        with torch.no_grad():
-            next_state_values = self.target_net(next_states_t).max(1)[0]
-            next_state_values[dones_t] = 0.0
-            next_state_values = next_state_values.detach()
-
-        expected_q_values = next_state_values * self.gamma + rewards_t
-        return F.mse_loss(q_values, expected_q_values)
-    
     def train(self) -> Tuple[Agent, EnvInfo, AgentTrainInfo]:
-        n_iter = 0
-        total_rewards = []
-        epsilon = self.epsilon_decay_start
-        self.agent.reset()
-        state, _ = self.env.reset()
-        self.agent.init_state(state)
-        writer = SummaryWriter()
-        while True:
-            n_iter += 1
-            epsilon = max(
-                self.epsilon_decay_final,
-                self.epsilon_decay_start - n_iter / self.epsilon_decay_last_frame
+        mp.freeze_support()
+        mp.set_start_method("spawn")
+        self.agent.net.share_memory()
+        q = mp.Queue(maxsize=self.n_envs)
+        self.pool = []
+        for id in range(self.n_envs):
+            process = mp.Process(
+                target=worker_function, 
+                args=(
+                    id,
+                    self.env,
+                    self.objective,
+                    self.gamma,
+                    self.n_steps,
+                    self.agent.net,
+                    self.obs_space,
+                    self.entropy_beta,
+                    self.clip_grad,
+                    q,
+                    self.logger
+                )
             )
+            process.start()
+            self.pool.append(process)
 
-            exp = self.agent.step(self.env, epsilon)
-            self.replay_buffer.append(exp)
-            if exp.done:
-                reward = self.agent.total_reward
-                total_rewards.append(reward)
-                m_reward = np.mean(total_rewards[-100:])
-                if self.logger:
-                    self.logger.info(
-                        f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}, " + \
-                        f"epsilon {epsilon:.2f}"
-                    )
-                writer.add_scalar("epsilon", epsilon, n_iter)
-                writer.add_scalar("reward_100", m_reward, n_iter)
-                writer.add_scalar("reward", reward, n_iter)
-
-                if m_reward > self.objective:
-                    if self.logger:
-                        self.logger.info(f"Solved in {n_iter} iterations!")
+        n_iter = 0
+        grads_accum = None
+        try:
+            while True:
+                grads = q.get()
+                if grads is None:
                     break
+                n_iter += 1
 
-                self.agent.reset()
-                state, _ = self.env.reset()
-                self.agent.init_state(state)
-            
-            if len(self.replay_buffer) < self.replay_buffer_start_size:
-                continue
-            if n_iter % self.sync_target_frames == 0:
-                self.target_net.load_state_dict(self.train_net.state_dict())
-            
-            self.optim.zero_grad()
-            batch = self.replay_buffer.sample(self.batch_size)
-            loss = self._loss(batch)
-            loss.backward()
-            self.optim.step()
-        writer.close()
+                if grads_accum is None:
+                    grads_accum = grads
+                else:
+                    for tgt_grad, grad in zip(grads_accum, grads):
+                        tgt_grad += grad
+                if n_iter % self.batch_size == 0:
+                    for param, grad in zip(self.agent.net.parameters(), grads_accum):
+                        param.grad = torch.FloatTensor(grad)
+                    torch.nn.utils.clip_grad_norm_(self.agent.net.parameters(), self.clip_grad)
+                    self.optim.step()
+                    grads_accum = None
+        finally:
+            for proc in self.pool:
+                proc.terminate()
+                proc.join()
 
         env_info = EnvInfo(
-            self.env.spec.id,
-            int(self.env.observation_space.n),
-            int(self.env.action_space.n)
+            self.env,
+            int(self.obs_space),
+            int(self.act_space)
         )
         train_info = AgentTrainInfo(
             n_iter,
             self.objective,
             self.gamma,
-            len(self.replay_buffer),
-            self.replay_buffer_start_size,
             self.batch_size,
+            self.n_steps,
             self.learning_rate,
-            self.sync_target_frames,
-            self.epsilon_decay_last_frame,
-            self.epsilon_decay_start,
-            self.epsilon_decay_final
+            self.clip_grad,
+            self.n_envs
         )
         return self.agent, env_info, train_info
+    
+def worker_function(
+    id: int, 
+    env_id: str,
+    objective: float,
+    gamma: float,
+    n_steps: int,
+    net: A2C, 
+    obs_space: int,
+    entropy_beta: float,
+    clip_grad: float,
+    queue: mp.Queue,
+    logger=None
+):
+    env = RewardWrapper(gym.make(env_id))
+    local_agent = Agent()
+    local_agent.net = net
+    local_agent.reset()
+    state, _ = env.reset()
+    local_agent.init_state(state)
+
+    total_rewards = deque(maxlen=100)
+    batch = []
+    counter = 0
+    while True:
+        exp = local_agent.step(env)
+        batch.append(exp)
+        counter += 1
+        if counter % n_steps == 0 or exp.done:
+            if exp.done:
+                total_rewards.append(local_agent.total_reward)
+                mean_rew = 0.0
+                for rew in total_rewards:
+                    mean_rew += rew
+                mean_rew /= 100
+                if logger:
+                    logger.info(f"{id}: reward: {total_rewards[-1]:.3f} mean_reward: {mean_rew:.3f}")
+                if mean_rew >= objective:
+                    break
+                local_agent.reset()
+                state, _ = env.reset()
+                local_agent.init_state(state)
+                r = 0
+            else:
+                # state_t = torch.as_tensor(local_agent._ohe(exp.next_state, obs_space))
+                state_t = torch.as_tensor(exp.next_state)
+                state_t.unsqueeze_(0)
+                _, r = net(state_t)
+                r = float(r.item())
+            rewards = []
+            for i in range(len(batch)-1, -1, -1):
+                r = batch[i].reward + r * gamma
+                rewards.insert(0, r)
+            states, actions = [], []
+            for e in batch:
+                states.append(torch.tensor(e.state))
+                actions.append(e.action)
+            # states_t = F.one_hot(torch.as_tensor(states), obs_space)
+            states_t = torch.stack(states)
+            actions_t = torch.as_tensor(actions)
+            rewards_t = torch.as_tensor(rewards)
+            net.zero_grad()
+            logits, values = net(states_t)
+            critic_loss = F.mse_loss(values.squeeze(-1), rewards_t)
+
+            log_probs = F.log_softmax(logits, dim=1)
+            advantages = rewards_t - values.squeeze(-1).detach()
+            actor_loss = -(advantages * log_probs[range(actions_t.size(0)), actions_t]).mean()
+
+            probs = F.softmax(logits, dim=1)
+            entropy_loss = entropy_beta * (probs * log_probs).sum(dim=1).mean()
+
+            loss = critic_loss + actor_loss + entropy_loss
+            loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(net.parameters(), clip_grad)
+            grads = [
+                param.grad.data.numpy()
+                if param.grad is not None
+                else None
+                for param in net.parameters()
+            ]
+            queue.put(grads)
+            batch.clear()
+    queue.put(None)
