@@ -9,7 +9,7 @@ import gymnasium as gym
 
 from .replay_buffer import ReplayBuffer
 from .wrappers import RewardWrapper
-from speechfulagent.agent import Agent, DQN
+from speechfulagent.agent import Agent, A2C
 from speechfulagent.dataclasses import *
 
 
