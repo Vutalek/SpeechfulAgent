@@ -28,7 +28,8 @@ class AgentTrainer:
     ):
         self.env = env
         environ = RewardWrapper(gym.make(env))
-        self.obs_space = environ.observation_space.shape[0]
+        # self.obs_space = environ.observation_space.shape[0]
+        self.obs_space = environ.observation_space.n
         self.act_space = environ.action_space.n
 
         self.objective = objective
@@ -44,7 +45,7 @@ class AgentTrainer:
         self.n_steps = n_steps
 
         self.train_net = A2C(self.obs_space, self.act_space)
-        self.optim = optim.Adam(params=self.train_net.parameters(), lr=learning_rate)
+        self.optim = optim.Adam(params=self.train_net.parameters(), lr=learning_rate, eps=1e-5)
         self.batch_size = batch_size
         self.learning_rate = learning_rate
 
@@ -154,7 +155,7 @@ def worker_function(
                 mean_rew = 0.0
                 for rew in total_rewards:
                     mean_rew += rew
-                mean_rew /= 100
+                mean_rew /= len(total_rewards)
                 if logger:
                     logger.info(f"{id}: reward: {total_rewards[-1]:.3f} mean_reward: {mean_rew:.3f}")
                 if mean_rew >= objective:
@@ -164,8 +165,8 @@ def worker_function(
                 local_agent.init_state(state)
                 r = 0
             else:
-                # state_t = torch.as_tensor(local_agent._ohe(exp.next_state, obs_space))
-                state_t = torch.as_tensor(exp.next_state)
+                state_t = torch.as_tensor(local_agent._ohe(exp.next_state, obs_space))
+                # state_t = torch.as_tensor(exp.next_state)
                 state_t.unsqueeze_(0)
                 _, r = net(state_t)
                 r = float(r.item())
@@ -175,10 +176,11 @@ def worker_function(
                 rewards.insert(0, r)
             states, actions = [], []
             for e in batch:
-                states.append(torch.tensor(e.state))
+                states.append(e.state)
+                # states.append(torch.tensor(e.state))
                 actions.append(e.action)
-            # states_t = F.one_hot(torch.as_tensor(states), obs_space)
-            states_t = torch.stack(states)
+            states_t = F.one_hot(torch.as_tensor(states), obs_space)
+            # states_t = torch.stack(states)
             actions_t = torch.as_tensor(actions)
             rewards_t = torch.as_tensor(rewards)
             net.zero_grad()

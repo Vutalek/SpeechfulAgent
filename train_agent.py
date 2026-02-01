@@ -3,8 +3,6 @@ import logging
 logging.basicConfig(level=logging.NOTSET, format="[%(levelname)s]: %(message)s")
 logger = logging.getLogger("train")
 
-import gymnasium as gym
-
 from speechfulagent import AgentTrainer
 
 ENVIRONMENT = "FrozenLake-v1"
@@ -18,19 +16,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    env = gym.make(ENVIRONMENT, is_slippery=True)
     trainer = AgentTrainer(
-        env=env,
-        objective=1,
-        gamma=0.9,
-        replay_buffer_size=50000,
-        replay_buffer_start_size=1000,
-        batch_size=64,
-        learning_rate=1e-4,
-        sync_target_frames=10,
-        epsilon_decay_last_frame=60000,
-        epsilon_decay_start=1.0,
-        epsilon_decay_final=0.01,
+        env=ENVIRONMENT,
+        objective=-4.0,
+        gamma=0.95,
+        entropy_beta=0.01,
+        clip_grad=0.1,
+        n_envs=4,
+        n_steps=4,
+        batch_size=6,
+        learning_rate=0.001,
         logger=logger if args.verbose else None
     )
     logger.info("start training")

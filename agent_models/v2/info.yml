@@ -1,0 +1,15 @@
+version: v2
+n_params: 86021
+environment:
+  name: FrozenLake-v1
+  n_observations: 16
+  n_actions: 4
+training:
+  n_iter: 24
+  mean_objective: -4.0
+  gamma: 0.95
+  batch_size: 6
+  n_steps: 4
+  learning_rate: 0.001
+  clip_grad: 0.1
+  n_envs: 4

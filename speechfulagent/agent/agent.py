@@ -45,8 +45,8 @@ class Agent(VersioningMixin):
         if self.env_state is None:
             raise RuntimeError("Uninitialized environment!")
 
-        # state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
-        state_t = torch.as_tensor(self.env_state)
+        state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
+        # state_t = torch.as_tensor(self.env_state)
         state_t.unsqueeze_(0)
         policy, _ = self.net(state_t)
         probs = torch.softmax(policy, dim=-1)
