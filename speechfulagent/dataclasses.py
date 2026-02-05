@@ -37,10 +37,12 @@ class AgentTrainInfo:
     learning_rate: float
     # target network
     sync_target_frames: int
-    # epsilon decay
-    epsilon_decay_last_frame: int
-    epsilon_decay_start: float
-    epsilon_decay_final: float
+    # Ornshtein-Uhlenbeck process
+    ou_enabled: bool
+    ou_mu: float
+    ou_theta: float
+    ou_sigma: float
+    ou_epsilon: float
 
     dict = asdict
 

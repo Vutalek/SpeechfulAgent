@@ -24,9 +24,11 @@ class AgentTrainer:
         batch_size: int,
         learning_rate: float,
         sync_target_frames: int,
-        epsilon_decay_last_frame: int,
-        epsilon_decay_start: float,
-        epsilon_decay_final: float,
+        ou_enable: bool,
+        ou_mu: float,
+        ou_theta: float,
+        ou_sigma: float,
+        ou_epsilon: float,
         logger = None
     ):
         self.env = RewardWrapper(env)
@@ -38,21 +40,27 @@ class AgentTrainer:
         self.replay_buffer = ReplayBuffer(replay_buffer_size)
         self.replay_buffer_start_size = replay_buffer_start_size
 
-        self.train_net = DQN(env.observation_space.n, env.action_space.n)
-        self.target_net = DQN(env.observation_space.n, env.action_space.n)
+        self.actor = Actor(env.observation_space.n, env.action_space.n)
+        self.tgt_actor = Actor(env.observation_space.n, env.action_space.n)
+        self.critic = Critic(env.observation_space.n, env.action_space.n)
+        self.tgt_critic = Critic(env.observation_space.n, env.action_space.n)
         self.sync_target_frames = sync_target_frames
         self.batch_size = batch_size
-        self.optim = optim.Adam(params=self.train_net.parameters(), lr=learning_rate)
+        self.actor_optim = optim.Adam(params=self.actor.parameters(), lr=learning_rate)
+        self.critic_optim = optim.Adam(params=self.critic.parameters(), lr=learning_rate)
         self.learning_rate = learning_rate
 
-        self.epsilon_decay_last_frame = epsilon_decay_last_frame
-        self.epsilon_decay_start = epsilon_decay_start
-        self.epsilon_decay_final = epsilon_decay_final
+        self.ou_enabled = ou_enable
+        self.ou_mu = ou_mu
+        self.ou_theta = ou_theta
+        self.ou_sigma = ou_sigma
+        self.ou_epsilon = ou_epsilon
 
         self.logger = logger
 
         self.agent = Agent()
-        self.agent.net = self.train_net
+        self.agent.actor = self.actor
+        self.agent.critic = self.critic
     
     def _batch_to_tensors(
         self, 
@@ -72,46 +80,23 @@ class AgentTrainer:
         dones_t = torch.as_tensor(dones)
         return states_t, actions_t, rewards_t, next_states_t, dones_t
     
-    def _loss(self, batch: List[Experience]) -> torch.Tensor:
-        states_t, actions_t, rewards_t, next_states_t, dones_t = self._batch_to_tensors(batch)
-        q_values = self.train_net(states_t).gather(
-            1, actions_t.unsqueeze(-1)
-        ).squeeze(-1)
-        with torch.no_grad():
-            next_state_values = self.target_net(next_states_t).max(1)[0]
-            next_state_values[dones_t] = 0.0
-            next_state_values = next_state_values.detach()
-
-        expected_q_values = next_state_values * self.gamma + rewards_t
-        return F.mse_loss(q_values, expected_q_values)
-    
     def train(self) -> Tuple[Agent, EnvInfo, AgentTrainInfo]:
         n_iter = 0
         total_rewards = []
-        epsilon = self.epsilon_decay_start
-        self.agent.reset()
         state, _ = self.env.reset()
+        self.agent.reset()
         self.agent.init_state(state)
         writer = SummaryWriter()
         while True:
             n_iter += 1
-            epsilon = max(
-                self.epsilon_decay_final,
-                self.epsilon_decay_start - n_iter / self.epsilon_decay_last_frame
-            )
-
-            exp = self.agent.step(self.env, epsilon)
+            exp = self.agent.step(self.env)
             self.replay_buffer.append(exp)
             if exp.done:
                 reward = self.agent.total_reward
                 total_rewards.append(reward)
                 m_reward = np.mean(total_rewards[-100:])
                 if self.logger:
-                    self.logger.info(
-                        f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}, " + \
-                        f"epsilon {epsilon:.2f}"
-                    )
-                writer.add_scalar("epsilon", epsilon, n_iter)
+                    self.logger.info(f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}")
                 writer.add_scalar("reward_100", m_reward, n_iter)
                 writer.add_scalar("reward", reward, n_iter)
 
@@ -120,20 +105,36 @@ class AgentTrainer:
                         self.logger.info(f"Solved in {n_iter} iterations!")
                     break
 
-                self.agent.reset()
                 state, _ = self.env.reset()
+                self.agent.reset()
                 self.agent.init_state(state)
             
             if len(self.replay_buffer) < self.replay_buffer_start_size:
                 continue
-            if n_iter % self.sync_target_frames == 0:
-                self.target_net.load_state_dict(self.train_net.state_dict())
             
-            self.optim.zero_grad()
             batch = self.replay_buffer.sample(self.batch_size)
-            loss = self._loss(batch)
-            loss.backward()
-            self.optim.step()
+            states_t, actions_t, rewards_t, next_states_t, dones_t = self._batch_to_tensors(batch)
+            self.critic_optim.zero_grad()
+            q_v = self.critic(states_t, actions_t)
+            next_actions_v = self.tgt_actor(next_states_t)
+            next_q_v = self.tgt_critic(next_states_t, next_actions_v)
+            next_q_v[dones_t] = 0.0
+            q_ref_v = rewards_t.unsqueeze(dim=-1) + next_q_v * self.gamma
+            critic_loss = F.mse_loss(q_v, q_ref_v.detach())
+            critic_loss.backward()
+            self.critic_optim.step()
+
+            self.actor_optim.zero_grad()
+            cur_actions_v = self.actor(states_t)
+            actor_loss = -self.critic(states_t, cur_actions_v)
+            actor_loss = actor_loss.mean()
+            actor_loss.backward()
+            self.actor_optim.step()
+
+            if n_iter % self.sync_target_frames == 0:
+                self.tgt_actor.load_state_dict(self.actor.state_dict())
+                self.tgt_critic.load_state_dict(self.critic.state_dict())
+
         writer.close()
 
         env_info = EnvInfo(
@@ -150,8 +151,10 @@ class AgentTrainer:
             self.batch_size,
             self.learning_rate,
             self.sync_target_frames,
-            self.epsilon_decay_last_frame,
-            self.epsilon_decay_start,
-            self.epsilon_decay_final
+            self.ou_enabled,
+            self.ou_mu,
+            self.ou_theta,
+            self.ou_sigma,
+            self.ou_epsilon
         )
         return self.agent, env_info, train_info
