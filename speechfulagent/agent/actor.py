@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-class DQN(nn.Module):
+class Actor(nn.Module):
     def __init__(self, input_shape: int, n_actions: int):
         super().__init__()
         self.net = nn.Sequential(
