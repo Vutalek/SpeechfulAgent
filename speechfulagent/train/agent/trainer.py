@@ -74,7 +74,7 @@ class AgentTrainer:
             next_states.append(e.next_state)
             dones.append(e.done)
         states_t = F.one_hot(torch.as_tensor(states), self.env.observation_space.n)
-        actions_t = torch.as_tensor(actions)
+        actions_t = F.one_hot(torch.as_tensor(actions), self.env.action_space.n)
         rewards_t = torch.as_tensor(rewards)
         next_states_t = F.one_hot(torch.as_tensor(next_states), self.env.observation_space.n)
         dones_t = torch.as_tensor(dones)
@@ -85,6 +85,7 @@ class AgentTrainer:
         total_rewards = []
         state, _ = self.env.reset()
         self.agent.reset()
+        self.agent.reset_ou()
         self.agent.init_state(state)
         writer = SummaryWriter()
         while True:
@@ -114,6 +115,8 @@ class AgentTrainer:
             
             batch = self.replay_buffer.sample(self.batch_size)
             states_t, actions_t, rewards_t, next_states_t, dones_t = self._batch_to_tensors(batch)
+
+            # critic training
             self.critic_optim.zero_grad()
             q_v = self.critic(states_t, actions_t)
             next_actions_v = self.tgt_actor(next_states_t)
@@ -124,6 +127,7 @@ class AgentTrainer:
             critic_loss.backward()
             self.critic_optim.step()
 
+            # actor training
             self.actor_optim.zero_grad()
             cur_actions_v = self.actor(states_t)
             actor_loss = -self.critic(states_t, cur_actions_v)

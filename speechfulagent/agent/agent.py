@@ -37,6 +37,8 @@ class Agent(VersioningMixin):
         # resets the state and total reward of agent
         self.env_state = None
         self.total_reward = 0.0
+
+    def reset_ou(self):
         self.actions_state = None
 
     def init_state(self, state: State):
