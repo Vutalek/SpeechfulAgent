@@ -63,7 +63,8 @@ class Agent(VersioningMixin):
         if self.env_state is None:
             raise RuntimeError("Uninitialized environment!")
     
-        state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
+        # state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
+        state_t = torch.as_tensor(self.env_state)
         state_t.unsqueeze_(0)
         mu_v = self.actor(state_t)
         actions = mu_v.squeeze(0)
@@ -76,8 +77,9 @@ class Agent(VersioningMixin):
 
             actions += self.ou_epsilon * self.actions_state
 
-        _, act_t = torch.max(actions, dim=0)
-        action = int(act_t.item())
+        # _, act_t = torch.max(actions, dim=0)
+        # action = int(act_t.item())
+        action = np.clip(actions, -1.0, 1.0)
         
         next_state, reward, is_done, is_trunc, _ = env.step(action)
         self.total_reward += float(reward)

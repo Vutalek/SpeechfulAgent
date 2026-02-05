@@ -31,7 +31,8 @@ class AgentTrainer:
         ou_epsilon: float,
         logger = None
     ):
-        self.env = RewardWrapper(env)
+        # self.env = RewardWrapper(env)
+        self.env = env
 
         self.objective = objective
 
@@ -40,10 +41,14 @@ class AgentTrainer:
         self.replay_buffer = ReplayBuffer(replay_buffer_size)
         self.replay_buffer_start_size = replay_buffer_start_size
 
-        self.actor = Actor(env.observation_space.n, env.action_space.n)
-        self.tgt_actor = Actor(env.observation_space.n, env.action_space.n)
-        self.critic = Critic(env.observation_space.n, env.action_space.n)
-        self.tgt_critic = Critic(env.observation_space.n, env.action_space.n)
+        # self.actor = Actor(env.observation_space.n, env.action_space.n)
+        # self.tgt_actor = Actor(env.observation_space.n, env.action_space.n)
+        # self.critic = Critic(env.observation_space.n, env.action_space.n)
+        # self.tgt_critic = Critic(env.observation_space.n, env.action_space.n)
+        self.actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
+        self.tgt_actor = Actor(env.observation_space.shape[0], env.action_space.shape[0])
+        self.critic = Critic(env.observation_space.shape[0], env.action_space.shape[0])
+        self.tgt_critic = Critic(env.observation_space.shape[0], env.action_space.shape[0])
         self.sync_target_frames = sync_target_frames
         self.batch_size = batch_size
         self.actor_optim = optim.Adam(params=self.actor.parameters(), lr=learning_rate)
@@ -73,10 +78,13 @@ class AgentTrainer:
             rewards.append(e.reward)
             next_states.append(e.next_state)
             dones.append(e.done)
-        states_t = F.one_hot(torch.as_tensor(states), self.env.observation_space.n)
-        actions_t = F.one_hot(torch.as_tensor(actions), self.env.action_space.n)
+        # states_t = F.one_hot(torch.as_tensor(states), self.env.observation_space.n)
+        states_t = torch.as_tensor(np.array(states))
+        # actions_t = F.one_hot(torch.as_tensor(actions), self.env.action_space.n)
+        actions_t = torch.as_tensor(np.array(actions))
         rewards_t = torch.as_tensor(rewards)
-        next_states_t = F.one_hot(torch.as_tensor(next_states), self.env.observation_space.n)
+        # next_states_t = F.one_hot(torch.as_tensor(next_states), self.env.observation_space.n)
+        next_states_t = torch.as_tensor(np.array(next_states))
         dones_t = torch.as_tensor(dones)
         return states_t, actions_t, rewards_t, next_states_t, dones_t
     
@@ -143,8 +151,8 @@ class AgentTrainer:
 
         env_info = EnvInfo(
             self.env.spec.id,
-            int(self.env.observation_space.n),
-            int(self.env.action_space.n)
+            int(self.env.observation_space.shape[0]),
+            int(self.env.action_space.shape[0])
         )
         train_info = AgentTrainInfo(
             n_iter,

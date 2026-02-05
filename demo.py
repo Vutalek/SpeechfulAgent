@@ -8,7 +8,8 @@ import gymnasium as gym
 from speechfulagent import SpeechfulAgent
 
 
-ENVIRONMENT = "FrozenLake-v1"
+# ENVIRONMENT = "FrozenLake-v1"
+ENVIRONMENT = "MountainCarContinuous-v0"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -33,6 +34,7 @@ if __name__ == "__main__":
         explainer_dir=args.explainer_dir,
         agent_version=args.agent_version,
         explainer_version=args.explainer_version,
+        frequency=0,
         temperature=1
     )
     logger.info(f"agent version: {agent.agent.get_version()}")
