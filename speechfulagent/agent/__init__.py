@@ -1,2 +1,2 @@
 from .agent import Agent
-from .net import DQN
+from .net import PPO

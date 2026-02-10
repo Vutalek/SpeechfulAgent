@@ -7,11 +7,11 @@ import gymnasium as gym
 from speechfulagent.types import *
 from speechfulagent.dataclasses import *
 from speechfulagent.versioning import VersioningMixin
-from .net import DQN
+from .net import PPO
 
 
 class Agent(VersioningMixin):
-    """DQN agent. Only works in environments with both discrete action
+    """PPO agent. Only works in environments with both discrete action
     and observation spaces."""
     def __init__(self):
         self.env_state = None
@@ -33,7 +33,7 @@ class Agent(VersioningMixin):
         return enc
     
     @torch.no_grad()
-    def step(self, env: gym.Env, epsilon: float = 0.0) -> Experience:
+    def step(self, env: gym.Env) -> Experience:
         """Agent's step in environment.
 
         Firstly, agent must be initialized with init_state() method.
@@ -44,18 +44,15 @@ class Agent(VersioningMixin):
         # checking if state is not None
         if self.env_state is None:
             raise RuntimeError("Uninitialized environment!")
-        # randomness
-        if np.random.random() < epsilon:
-            action = env.action_space.sample()
-        else:
-            state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
-            state_t.unsqueeze_(0)
-            q_values = self.net(state_t)
-            _, act_t = torch.max(q_values, dim=1)
-            action = int(act_t.item())
+
+        state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
+        state_t.unsqueeze_(0)
+        policy, _ = self.net(state_t)
+        probs = torch.softmax(policy, dim=-1)
+        action = int(torch.multinomial(probs, 1).item())
         
         next_state, reward, is_done, is_trunc, _ = env.step(action)
-        self.total_reward += reward
+        self.total_reward += float(reward)
 
         old_state = self.env_state
         self.env_state = next_state
@@ -64,7 +61,7 @@ class Agent(VersioningMixin):
         exp = Experience(
             old_state,
             action,
-            reward,
+            float(reward),
             next_state,
             done
         )
@@ -84,5 +81,5 @@ class Agent(VersioningMixin):
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
         state_dict = torch.load(path + '/' + "weights.dat")
-        self.net = DQN(data["environment"]["n_observations"], data["environment"]["n_actions"])
+        self.net = PPO(data["environment"]["n_observations"], data["environment"]["n_actions"])
         self.net.load_state_dict(state_dict)
