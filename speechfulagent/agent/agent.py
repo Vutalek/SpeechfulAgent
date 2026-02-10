@@ -7,7 +7,8 @@ import gymnasium as gym
 from speechfulagent.types import *
 from speechfulagent.dataclasses import *
 from speechfulagent.versioning import VersioningMixin
-from .net import PPO
+from .actor import Actor
+from .critic import Critic
 
 
 class Agent(VersioningMixin):
@@ -16,7 +17,8 @@ class Agent(VersioningMixin):
     def __init__(self):
         self.env_state = None
         self.total_reward = 0.0
-        self.net = None
+        self.actor = None
+        self.critic = None
 
     def reset(self):
         # resets the state and total reward of agent
@@ -39,7 +41,7 @@ class Agent(VersioningMixin):
         Firstly, agent must be initialized with init_state() method.
         """
         # checking if model is loaded
-        if self.net is None:
+        if self.actor is None:
             raise RuntimeError("Model not loaded!")
         # checking if state is not None
         if self.env_state is None:
@@ -47,7 +49,7 @@ class Agent(VersioningMixin):
 
         state_t = torch.as_tensor(self._ohe(self.env_state, env.observation_space.n))
         state_t.unsqueeze_(0)
-        policy, _ = self.net(state_t)
+        policy = self.actor(state_t)
         probs = torch.softmax(policy, dim=-1)
         action = int(torch.multinomial(probs, 1).item())
         
@@ -68,12 +70,19 @@ class Agent(VersioningMixin):
         return exp
     
     def _save_model(self, path: str, version: str, *args, **kwargs) -> Dict[str, Any]:
-        torch.save(self.net.state_dict(), path + '/' + 'weights.dat')
+        torch.save(
+            {
+                "actor": self.actor.state_dict(),
+                "critic": self.critic.state_dict()
+            },
+            path + '/' + 'weights.dat'
+        )
         env: EnvInfo = kwargs.get("env")
         train: AgentTrainInfo = kwargs.get("train")
         info = {
             "version": version,
-            "n_params": sum(p.numel() for p in self.net.parameters()),
+            "n_params_actor": sum(p.numel() for p in self.actor.parameters()),
+            "n_params_critic": sum(p.numel() for p in self.critic.parameters()),
             "environment": env.dict(),
             "training": train.dict()
         }
@@ -81,5 +90,8 @@ class Agent(VersioningMixin):
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
         state_dict = torch.load(path + '/' + "weights.dat")
-        self.net = PPO(data["environment"]["n_observations"], data["environment"]["n_actions"])
-        self.net.load_state_dict(state_dict)
+        self.actor = Actor(data["environment"]["n_observations"], data["environment"]["n_actions"])
+        self.actor.load_state_dict(state_dict["actor"])
+
+        self.critic = Critic(data["environment"]["n_observations"])
+        self.critic.load_state_dict(state_dict["critic"])

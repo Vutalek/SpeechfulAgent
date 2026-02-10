@@ -1,2 +1,3 @@
 from .agent import Agent
-from .net import PPO
+from .actor import Actor
+from .critic import Critic
