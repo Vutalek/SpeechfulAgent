@@ -7,9 +7,8 @@ import torch.optim as optim
 from torch.utils.tensorboard.writer import SummaryWriter
 import gymnasium as gym
 
-from .replay_buffer import ReplayBuffer
 from .wrappers import RewardWrapper
-from speechfulagent.agent import Agent, DQN
+from speechfulagent.agent import Agent, Actor, Critic
 from speechfulagent.dataclasses import *
 
 
@@ -19,14 +18,10 @@ class AgentTrainer:
         env: gym.Env,
         objective: float,
         gamma: float,
-        replay_buffer_size: int,
-        replay_buffer_start_size: int,
+        trajectory_size: int,
         batch_size: int,
-        learning_rate: float,
-        sync_target_frames: int,
-        epsilon_decay_last_frame: int,
-        epsilon_decay_start: float,
-        epsilon_decay_final: float,
+        learning_rate_actor: float,
+        learning_rate_critic: float,
         logger = None
     ):
         self.env = RewardWrapper(env)
@@ -35,24 +30,22 @@ class AgentTrainer:
 
         self.gamma = gamma
 
-        self.replay_buffer = ReplayBuffer(replay_buffer_size)
-        self.replay_buffer_start_size = replay_buffer_start_size
+        self.trajectory = []
+        self.trajectory_size = trajectory_size
 
-        self.train_net = DQN(env.observation_space.n, env.action_space.n)
-        self.target_net = DQN(env.observation_space.n, env.action_space.n)
-        self.sync_target_frames = sync_target_frames
+        self.actor_net = Actor(env.observation_space.n, env.action_space.n)
+        self.critic_net = Critic(env.observation_space.n)
+        self.optim_actor = optim.Adam(params=self.actor_net.parameters(), lr=learning_rate_actor)
+        self.optim_critic = optim.Adam(params=self.critic_net.parameters(), lr=learning_rate_critic)
+        self.learning_rate_actor = learning_rate_actor
+        self.learning_rate_critic = learning_rate_critic
         self.batch_size = batch_size
-        self.optim = optim.Adam(params=self.train_net.parameters(), lr=learning_rate)
-        self.learning_rate = learning_rate
-
-        self.epsilon_decay_last_frame = epsilon_decay_last_frame
-        self.epsilon_decay_start = epsilon_decay_start
-        self.epsilon_decay_final = epsilon_decay_final
 
         self.logger = logger
 
         self.agent = Agent()
-        self.agent.net = self.train_net
+        self.agent.actor = self.actor_net
+        self.agent.critic = self.critic_net
     
     def _batch_to_tensors(
         self, 
@@ -72,46 +65,26 @@ class AgentTrainer:
         dones_t = torch.as_tensor(dones)
         return states_t, actions_t, rewards_t, next_states_t, dones_t
     
-    def _loss(self, batch: List[Experience]) -> torch.Tensor:
-        states_t, actions_t, rewards_t, next_states_t, dones_t = self._batch_to_tensors(batch)
-        q_values = self.train_net(states_t).gather(
-            1, actions_t.unsqueeze(-1)
-        ).squeeze(-1)
-        with torch.no_grad():
-            next_state_values = self.target_net(next_states_t).max(1)[0]
-            next_state_values[dones_t] = 0.0
-            next_state_values = next_state_values.detach()
-
-        expected_q_values = next_state_values * self.gamma + rewards_t
-        return F.mse_loss(q_values, expected_q_values)
-    
     def train(self) -> Tuple[Agent, EnvInfo, AgentTrainInfo]:
         n_iter = 0
         total_rewards = []
-        epsilon = self.epsilon_decay_start
         self.agent.reset()
         state, _ = self.env.reset()
         self.agent.init_state(state)
         writer = SummaryWriter()
         while True:
             n_iter += 1
-            epsilon = max(
-                self.epsilon_decay_final,
-                self.epsilon_decay_start - n_iter / self.epsilon_decay_last_frame
-            )
+            exp = self.agent.step(self.env)
 
-            exp = self.agent.step(self.env, epsilon)
-            self.replay_buffer.append(exp)
+            self.trajectory.append(exp)
             if exp.done:
                 reward = self.agent.total_reward
                 total_rewards.append(reward)
                 m_reward = np.mean(total_rewards[-100:])
                 if self.logger:
                     self.logger.info(
-                        f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}, " + \
-                        f"epsilon {epsilon:.2f}"
+                        f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}"
                     )
-                writer.add_scalar("epsilon", epsilon, n_iter)
                 writer.add_scalar("reward_100", m_reward, n_iter)
                 writer.add_scalar("reward", reward, n_iter)
 
@@ -124,10 +97,8 @@ class AgentTrainer:
                 state, _ = self.env.reset()
                 self.agent.init_state(state)
             
-            if len(self.replay_buffer) < self.replay_buffer_start_size:
+            if len(self.trajectory) < self.trajectory_size:
                 continue
-            if n_iter % self.sync_target_frames == 0:
-                self.target_net.load_state_dict(self.train_net.state_dict())
             
             self.optim.zero_grad()
             batch = self.replay_buffer.sample(self.batch_size)
