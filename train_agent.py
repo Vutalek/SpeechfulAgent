@@ -22,12 +22,12 @@ if __name__ == "__main__":
     trainer = AgentTrainer(
         env=env,
         objective=1,
-        gamma=0.9,
+        gamma=0.99,
         gae_lambda=0.95,
-        trajectory_size=2048,
-        epochs=10,
-        eps=0.2,
-        batch_size=64,
+        trajectory_size=129,
+        epochs=4,
+        eps=0.4,
+        batch_size=8,
         learning_rate_actor=1e-5,
         learning_rate_critic=1e-4,
         logger=logger if args.verbose else None
