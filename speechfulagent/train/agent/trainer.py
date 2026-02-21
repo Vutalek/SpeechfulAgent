@@ -20,6 +20,7 @@ class AgentTrainer:
         gamma: float,
         gae_lambda: float,
         trajectory_size: int,
+        epochs: int,
         eps: float,
         batch_size: int,
         learning_rate_actor: float,
@@ -35,6 +36,7 @@ class AgentTrainer:
 
         self.trajectory = []
         self.trajectory_size = trajectory_size
+        self.epochs = epochs
         self.eps = eps
 
         self.actor_net = Actor(env.observation_space.n, env.action_space.n)
@@ -139,36 +141,38 @@ class AgentTrainer:
             trajectory = trajectory[:-1]
             logprob_old = logprob_old[:-1].detach()
 
-            for batch_offset in range(0, self.trajectory_size, self.batch_size):
-                batch_end = batch_offset + self.batch_size
-                batch_states = states[batch_offset:batch_end]
-                batch_actions = actions[batch_offset:batch_end]
-                batch_advs = advantages[batch_offset:batch_end].unsqueeze(-1)
-                batch_refs = references[batch_offset:batch_end]
-                batch_logprob_old = logprob_old[batch_offset:batch_end]
+            for _ in range(self.epochs):
+                for batch_offset in range(0, self.trajectory_size, self.batch_size):
+                    batch_end = batch_offset + self.batch_size
+                    batch_states = states[batch_offset:batch_end]
+                    batch_actions = actions[batch_offset:batch_end]
+                    batch_advs = advantages[batch_offset:batch_end].unsqueeze(-1)
+                    batch_refs = references[batch_offset:batch_end]
+                    batch_logprob_old = logprob_old[batch_offset:batch_end]
 
-                # critic
-                self.optim_critic.zero_grad()
-                value = self.critic_net(batch_states)
-                loss = F.mse_loss(value.squeeze(-1), batch_refs)
-                loss.backward()
-                self.optim_critic.step()
+                    # critic
+                    self.optim_critic.zero_grad()
+                    value = self.critic_net(batch_states)
+                    loss = F.mse_loss(value.squeeze(-1), batch_refs)
+                    loss.backward()
+                    self.optim_critic.step()
 
-                # actor
-                self.optim_actor.zero_grad()
-                batch_logits = self.actor_net(batch_states)
-                batch_logprob = torch.gather(
-                    torch.log_softmax(batch_logits, dim=-1),
-                    1,
-                    batch_actions.unsqueeze(0).T
-                ).squeeze()
-                ratio = torch.exp(batch_logprob - batch_logprob_old)
-                surr_obj = batch_advs * ratio
-                clip_ratio = torch.clamp(ratio, 1.0 - self.eps, 1.0 + self.eps)
-                clip_surr_obj = batch_advs * clip_ratio
-                loss_policy = -torch.min(surr_obj, clip_surr_obj).mean()
-                loss_policy.backward()
-                self.optim_actor.step()
+                    # actor
+                    self.optim_actor.zero_grad()
+                    batch_logits = self.actor_net(batch_states)
+                    batch_logprob = torch.gather(
+                        torch.log_softmax(batch_logits, dim=-1),
+                        1,
+                        batch_actions.unsqueeze(0).T
+                    ).squeeze()
+                    ratio = torch.exp(batch_logprob - batch_logprob_old)
+                    surr_obj = batch_advs * ratio
+                    clip_ratio = torch.clamp(ratio, 1.0 - self.eps, 1.0 + self.eps)
+                    clip_surr_obj = batch_advs * clip_ratio
+                    loss_policy = -torch.min(surr_obj, clip_surr_obj).mean()
+                    loss_policy.backward()
+                    self.optim_actor.step()
+            self.trajectory.clear()
         writer.close()
 
         env_info = EnvInfo(
@@ -182,6 +186,7 @@ class AgentTrainer:
             self.gamma,
             self.gae_lambda,
             self.trajectory_size,
+            self.epochs,
             self.eps,
             self.batch_size,
             self.learning_rate_actor,

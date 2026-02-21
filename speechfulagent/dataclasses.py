@@ -32,6 +32,7 @@ class AgentTrainInfo:
     # ppo + gae
     gae_lambda: float
     trajectory_size: int
+    epochs: int
     eps: float
     # optimization
     batch_size: int
