@@ -18,12 +18,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # env = gym.make(ENVIRONMENT, is_slippery=True)
-    env = gym.make("CartPole-v1")
+    env = gym.make(ENVIRONMENT, is_slippery=True)
     trainer = AgentTrainer(
         env=env,
-        objective=100,
-        gamma=0.99,
+        objective=1,
+        gamma=0.95,
         gae_lambda=0.95,
         trajectory_size=2049,
         epochs=10,
