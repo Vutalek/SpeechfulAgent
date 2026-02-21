@@ -1,0 +1,18 @@
+version: v1
+n_params_actor: 34434
+n_params_critic: 17281
+environment:
+  name: CartPole-v1
+  n_observations: 4
+  n_actions: 2
+training:
+  n_iter: 15190
+  mean_objective: 100
+  gamma: 0.99
+  gae_lambda: 0.95
+  trajectory_size: 2049
+  epochs: 10
+  eps: 0.2
+  batch_size: 64
+  learning_rate_actor: 0.0003
+  learning_rate_critic: 0.0003

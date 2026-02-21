@@ -27,7 +27,8 @@ class AgentTrainer:
         learning_rate_critic: float,
         logger = None
     ):
-        self.env = RewardWrapper(env)
+        # self.env = RewardWrapper(env)
+        self.env = env
 
         self.objective = objective
 
@@ -39,8 +40,8 @@ class AgentTrainer:
         self.epochs = epochs
         self.eps = eps
 
-        self.actor_net = Actor(env.observation_space.n, env.action_space.n)
-        self.critic_net = Critic(env.observation_space.n)
+        self.actor_net = Actor(env.observation_space.shape[0], env.action_space.n)
+        self.critic_net = Critic(env.observation_space.shape[0])
         self.optim_actor = optim.Adam(params=self.actor_net.parameters(), lr=learning_rate_actor)
         self.optim_critic = optim.Adam(params=self.critic_net.parameters(), lr=learning_rate_critic)
         self.learning_rate_actor = learning_rate_actor
@@ -59,7 +60,7 @@ class AgentTrainer:
         states: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         vals = self.critic_net(states)
-        vals = vals.data.numpy()
+        vals = vals.squeeze().data.numpy()
         # generalized advantage estimation
         last_gae = 0.0
         result_adv = []
@@ -75,8 +76,8 @@ class AgentTrainer:
                 last_gae = delta + self.gamma * self.gae_lambda * last_gae
             result_adv.append(last_gae)
             result_ref.append(last_gae + val)
-        advs = torch.FloatTensor(np.asarray(result_adv))
-        refs = torch.FloatTensor(np.asarray(result_ref))
+        advs = torch.FloatTensor(np.asarray(list(reversed(result_adv))))
+        refs = torch.FloatTensor(np.asarray(list(reversed(result_ref))))
         return advs, refs
     
     def _batch_to_tensors(
@@ -87,7 +88,8 @@ class AgentTrainer:
         for e in batch:
             states.append(e.state)
             actions.append(e.action)
-        states_t = F.one_hot(torch.as_tensor(states), self.env.observation_space.n)
+        # states_t = F.one_hot(torch.as_tensor(states), self.env.observation_space.n)
+        states_t = torch.as_tensor(np.array(states))
         actions_t = torch.as_tensor(actions)
         return states_t, actions_t
     
@@ -152,7 +154,7 @@ class AgentTrainer:
                     # critic
                     self.optim_critic.zero_grad()
                     value = self.critic_net(batch_states)
-                    loss = F.mse_loss(value, batch_refs)
+                    loss = F.mse_loss(value.squeeze(), batch_refs)
                     loss.backward()
                     self.optim_critic.step()
 
@@ -178,7 +180,7 @@ class AgentTrainer:
 
         env_info = EnvInfo(
             self.env.spec.id,
-            int(self.env.observation_space.n),
+            int(self.env.observation_space.shape[0]),
             int(self.env.action_space.n)
         )
         train_info = AgentTrainInfo(
