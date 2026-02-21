@@ -18,7 +18,9 @@ class AgentTrainer:
         env: gym.Env,
         objective: float,
         gamma: float,
+        gae_lambda: float,
         trajectory_size: int,
+        eps: float,
         batch_size: int,
         learning_rate_actor: float,
         learning_rate_critic: float,
@@ -29,9 +31,11 @@ class AgentTrainer:
         self.objective = objective
 
         self.gamma = gamma
+        self.gae_lambda = gae_lambda
 
         self.trajectory = []
         self.trajectory_size = trajectory_size
+        self.eps = eps
 
         self.actor_net = Actor(env.observation_space.n, env.action_space.n)
         self.critic_net = Critic(env.observation_space.n)
@@ -46,24 +50,44 @@ class AgentTrainer:
         self.agent = Agent()
         self.agent.actor = self.actor_net
         self.agent.critic = self.critic_net
+
+    def _reference_advantage(
+        self, 
+        trajectory: List[Experience], 
+        states: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        vals = self.critic_net(states)
+        vals = vals.numpy()
+        # generalized advantage estimation
+        last_gae = 0.0
+        result_adv = []
+        result_ref = []
+        for val, next_val, exp in zip(
+            reversed(vals[:-1]), reversed(vals[1:]), reversed(trajectory[:-1])
+        ):
+            if exp.done:
+                delta = exp.reward - val
+                last_gae = delta
+            else:
+                delta = exp.reward + self.gamma * next_val - val
+                last_gae = delta + self.gamma * self.gae_lambda * last_gae
+            result_adv.append(last_gae)
+            result_ref.append(last_gae + val)
+        advs = torch.FloatTensor(np.asarray(result_adv))
+        refs = torch.FloatTensor(np.asarray(result_ref))
+        return advs, refs
     
     def _batch_to_tensors(
         self, 
         batch: List[Experience]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        states, actions, rewards, next_states, dones = [], [], [], [], []
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        states, actions = [], []
         for e in batch:
             states.append(e.state)
             actions.append(e.action)
-            rewards.append(e.reward)
-            next_states.append(e.next_state)
-            dones.append(e.done)
         states_t = F.one_hot(torch.as_tensor(states), self.env.observation_space.n)
         actions_t = torch.as_tensor(actions)
-        rewards_t = torch.as_tensor(rewards)
-        next_states_t = F.one_hot(torch.as_tensor(next_states), self.env.observation_space.n)
-        dones_t = torch.as_tensor(dones)
-        return states_t, actions_t, rewards_t, next_states_t, dones_t
+        return states_t, actions_t
     
     def train(self) -> Tuple[Agent, EnvInfo, AgentTrainInfo]:
         n_iter = 0
@@ -100,11 +124,51 @@ class AgentTrainer:
             if len(self.trajectory) < self.trajectory_size:
                 continue
             
-            self.optim.zero_grad()
-            batch = self.replay_buffer.sample(self.batch_size)
-            loss = self._loss(batch)
-            loss.backward()
-            self.optim.step()
+            states, actions = self._batch_to_tensors(self.trajectory)
+            advantages, references = self._reference_advantage(self.trajectory, states)
+            logits = self.actor_net(states)
+            logprob_old = torch.gather(
+                torch.log_softmax(logits, dim=-1),
+                1,
+                actions.unsqueeze(0).T
+            ).squeeze()
+
+            # standartization
+            advantages = advantages - torch.mean(advantages)
+            advantages /= torch.std(advantages)
+            trajectory = trajectory[:-1]
+            logprob_old = logprob_old[:-1].detach()
+
+            for batch_offset in range(0, self.trajectory_size, self.batch_size):
+                batch_end = batch_offset + self.batch_size
+                batch_states = states[batch_offset:batch_end]
+                batch_actions = actions[batch_offset:batch_end]
+                batch_advs = advantages[batch_offset:batch_end].unsqueeze(-1)
+                batch_refs = references[batch_offset:batch_end]
+                batch_logprob_old = logprob_old[batch_offset:batch_end]
+
+                # critic
+                self.optim_critic.zero_grad()
+                value = self.critic_net(batch_states)
+                loss = F.mse_loss(value.squeeze(-1), batch_refs)
+                loss.backward()
+                self.optim_critic.step()
+
+                # actor
+                self.optim_actor.zero_grad()
+                batch_logits = self.actor_net(batch_states)
+                batch_logprob = torch.gather(
+                    torch.log_softmax(batch_logits, dim=-1),
+                    1,
+                    batch_actions.unsqueeze(0).T
+                ).squeeze()
+                ratio = torch.exp(batch_logprob - batch_logprob_old)
+                surr_obj = batch_advs * ratio
+                clip_ratio = torch.clamp(ratio, 1.0 - self.eps, 1.0 + self.eps)
+                clip_surr_obj = batch_advs * clip_ratio
+                loss_policy = -torch.min(surr_obj, clip_surr_obj).mean()
+                loss_policy.backward()
+                self.optim_actor.step()
         writer.close()
 
         env_info = EnvInfo(
@@ -116,13 +180,11 @@ class AgentTrainer:
             n_iter,
             self.objective,
             self.gamma,
-            len(self.replay_buffer),
-            self.replay_buffer_start_size,
+            self.gae_lambda,
+            self.trajectory_size,
+            self.eps,
             self.batch_size,
-            self.learning_rate,
-            self.sync_target_frames,
-            self.epsilon_decay_last_frame,
-            self.epsilon_decay_start,
-            self.epsilon_decay_final
+            self.learning_rate_actor,
+            self.learning_rate_critic
         )
         return self.agent, env_info, train_info

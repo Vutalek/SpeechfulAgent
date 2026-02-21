@@ -29,6 +29,10 @@ class AgentTrainInfo:
     mean_objective: float
     # gamma
     gamma: float
+    # ppo + gae
+    gae_lambda: float
+    trajectory_size: int
+    eps: float
     # optimization
     batch_size: int
     learning_rate_actor: float
