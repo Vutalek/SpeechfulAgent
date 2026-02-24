@@ -41,6 +41,32 @@ class A3CTrainInfo:
     dict = asdict
 
 @dataclass
+class DDPGTrainInfo:
+    # iterations count
+    n_iter: int
+    # objective bound
+    mean_objective: float
+    # gamma
+    gamma: float
+    # replay buffer
+    replay_buffer_size: int
+    replay_buffer_start_size: int
+    # optimization
+    batch_size: int
+    n_steps: int
+    learning_rate: float
+    # target network
+    sync_target_frames: int
+    # Ornshtein-Uhlenbeck process
+    ou_enabled: bool
+    ou_mu: float
+    ou_theta: float
+    ou_sigma: float
+    ou_epsilon: float
+
+    dict = asdict
+
+@dataclass
 class DQNTrainInfo:
     # iterations count
     n_iter: int

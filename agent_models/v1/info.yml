@@ -1,4 +1,5 @@
 version: v1
+<<<<<<< HEAD
 n_params: 86021
 environment:
   name: FrozenLake-v1
@@ -13,3 +14,25 @@ training:
   learning_rate: 0.001
   clip_grad: 0.1
   n_envs: 4
+=======
+n_params_actor: 66817
+n_params_critic: 132865
+environment:
+  name: MountainCarContinuous-v0
+  n_observations: 2
+  n_actions: 1
+training:
+  n_iter: 626
+  mean_objective: 1
+  gamma: 0.99
+  replay_buffer_size: 626
+  replay_buffer_start_size: 1000
+  batch_size: 64
+  learning_rate: 0.0001
+  sync_target_frames: 100
+  ou_enabled: true
+  ou_mu: 0.0
+  ou_theta: 0.15
+  ou_sigma: 0.2
+  ou_epsilon: 1.0
+>>>>>>> research/ddpg
