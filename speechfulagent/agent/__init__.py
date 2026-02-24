@@ -1,9 +1,3 @@
-from .dqnagent import Agent
-from .dqnnet import DQN
-from .agent import Agent
-<<<<<<< HEAD
-from .net import A2C
-=======
-from .actor import Actor
-from .critic import Critic
->>>>>>> research/ddpg
+from .ddpgagent import Agent
+from .ddpgactor import Actor
+from .ddpgcritic import Critic
