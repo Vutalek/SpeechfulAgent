@@ -20,18 +20,15 @@ if __name__ == "__main__":
     env = gym.make("MountainCarContinuous-v0")
     trainer = AgentTrainer(
         env=env,
-        objective=80,
+        objective=1,
         gamma=0.95,
-        replay_buffer_size=100000,
-        replay_buffer_start_size=1000,
+        gae_lambda=0.95,
+        trajectory_size=2049,
+        epochs=10,
+        eps=0.2,
         batch_size=64,
-        learning_rate=1e-3,
-        sync_target_frames=1000,
-        ou_enable=True,
-        ou_mu=0.0,
-        ou_theta=0.15,
-        ou_sigma=0.5,
-        ou_epsilon=1.0,
+        learning_rate_actor=0.0003,
+        learning_rate_critic=0.0003,
         logger=logger if args.verbose else None
     )
     logger.info("start training")

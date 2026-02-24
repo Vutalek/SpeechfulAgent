@@ -41,6 +41,26 @@ class A3CTrainInfo:
     dict = asdict
 
 @dataclass
+class PPOTrainInfo:
+    # iterations count
+    n_iter: int
+    # objective bound
+    mean_objective: float
+    # gamma
+    gamma: float
+    # ppo + gae
+    gae_lambda: float
+    trajectory_size: int
+    epochs: int
+    eps: float
+    # optimization
+    batch_size: int
+    learning_rate_actor: float
+    learning_rate_critic: float
+
+    dict = asdict
+
+@dataclass
 class DDPGTrainInfo:
     # iterations count
     n_iter: int
@@ -53,7 +73,6 @@ class DDPGTrainInfo:
     replay_buffer_start_size: int
     # optimization
     batch_size: int
-    n_steps: int
     learning_rate: float
     # target network
     sync_target_frames: int
@@ -79,7 +98,6 @@ class DQNTrainInfo:
     replay_buffer_start_size: int
     # optimization
     batch_size: int
-    n_steps: int
     learning_rate: float
     # target network
     sync_target_frames: int
