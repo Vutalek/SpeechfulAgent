@@ -9,8 +9,9 @@ speechfulagent
 │   __init__.py
 │
 ├───agent
+│       actor.py
 │       agent.py
-│       net.py
+│       critic.py
 │       __init__.py
 │
 ├───explainer
@@ -32,7 +33,6 @@ speechfulagent
     │   __init__.py
     │
     ├───agent
-    │       replay_buffer.py
     │       trainer.py
     │       wrappers.py
     │       __init__.py
@@ -54,9 +54,11 @@ versioning.py - класс-примесь для версионирования.
 
 agent - пакет с модулями для построения агента.
 
+actor.py - нейронная сеть актора.
+
 agent.py - агент.
 
-net.py - нейронная сеть для агента.
+critic.py - нейронная сеть критика.
 
 explainer - пакет с модулями для построения объяснителя.
 
@@ -77,8 +79,6 @@ state_encoder.py - энкодер-блок трансформера для пр�
 train - пакет с модулями для организации процесса обучения.
 
 agent - подпакет с модулями для обучения агента.
-
-replay_buffer.py - реплей буффер для сохранения sars' кортежей.
 
 trainer.py - объявление класса AgentTrainer, который производит обучение агента.
 
