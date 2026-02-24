@@ -7,7 +7,7 @@ import gymnasium as gym
 from speechfulagent.types import *
 from speechfulagent.dataclasses import *
 from speechfulagent.versioning import VersioningMixin
-from .net import DQN
+from .dqnnet import DQN
 
 
 class Agent(VersioningMixin):

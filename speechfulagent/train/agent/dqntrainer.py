@@ -141,7 +141,7 @@ class AgentTrainer:
             int(self.env.observation_space.n),
             int(self.env.action_space.n)
         )
-        train_info = AgentTrainInfo(
+        train_info = DQNTrainInfo(
             n_iter,
             self.objective,
             self.gamma,

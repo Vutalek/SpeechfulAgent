@@ -22,7 +22,7 @@ class EnvInfo:
     dict = asdict
 
 @dataclass
-class AgentTrainInfo:
+class DQNTrainInfo:
     # iterations count
     n_iter: int
     # objective bound
