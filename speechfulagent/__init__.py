@@ -1,4 +1,3 @@
-from .agent import Agent
 from .explainer import Explainer
-from .train import AgentTrainer, ExplainerTrainer, SequenceExplanationsDataset
+from .train import ExplainerTrainer, SequenceExplanationsDataset
 from .speechfulagent import SpeechfulAgent

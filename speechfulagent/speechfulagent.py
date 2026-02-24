@@ -3,7 +3,6 @@ from typing import List, Tuple
 
 import gymnasium as gym
 
-from .agent import Agent
 from .explainer import Explainer, embed_sequence
 from speechfulagent.dataclasses import *
 
