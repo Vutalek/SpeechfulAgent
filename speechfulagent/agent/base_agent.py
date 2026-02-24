@@ -68,8 +68,3 @@ class BaseAgent(VersioningMixin, ABC):
     @abstractmethod
     def _step(self) -> Experience:
         pass
-
-    @abstractmethod
-    def update(self):
-        """One training step"""
-        pass
