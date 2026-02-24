@@ -29,9 +29,17 @@ class Agent(BaseAgent):
         else:
             state = F.one_hot(torch.as_tensor(self.env_state), self.obs_n)
         state.unsqueeze_(0)
-        policy, _ = self.net(state)
-        probs = torch.softmax(policy, dim=-1)
-        action = int(torch.multinomial(probs, 1).item())
+
+        if self.is_act_cont:
+            mu, var, _ = self.net(state)
+            mu = mu.data.numpy()
+            sigma = torch.sqrt(var).data.numpy()
+            action = np.random.normal(mu, sigma)
+            action = np.clip(action, -1, 1)
+        else:
+            policy, _ = self.net(state)
+            probs = torch.softmax(policy, dim=-1)
+            action = int(torch.multinomial(probs, 1).item())
         
         next_state, reward, is_done, is_trunc, _ = self.env.step(action)
         self.total_reward += float(reward)

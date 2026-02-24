@@ -1,12 +1,14 @@
 from dataclasses import dataclass, asdict
 
+from numpy.typing import NDArray
+
 from speechfulagent.types import *
 
 
 @dataclass
 class Experience:
     state: State
-    action: Action
+    action: Action | NDArray
     reward: float
     next_state: State
     done: bool
