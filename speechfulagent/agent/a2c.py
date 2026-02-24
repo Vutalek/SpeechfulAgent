@@ -75,5 +75,6 @@ class A2CAgent(BaseAgent):
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
         self.net = torch.load(path + '/' + "model.pth")
 
-    def load_model(self, net: torch.nn.Module):
+    def set_model(self, net: torch.nn.Module):
+        """Sets local model for agent"""
         self.net = net

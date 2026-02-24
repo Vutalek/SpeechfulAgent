@@ -107,3 +107,11 @@ class DDPGAgent(BaseAgent):
         models = torch.load(path + '/' + "model.pth")
         self.actor = models["actor"]
         self.critic = models["critic"]
+
+    def set_actor(self, actor: torch.nn.Module):
+        """Sets local actor for agent"""
+        self.actor = actor
+
+    def set_critic(self, critic: torch.nn.Module):
+        """Sets local critic for agent"""
+        self.actor = critic
