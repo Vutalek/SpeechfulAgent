@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 from typing import List, Tuple
 
 import numpy as np
@@ -172,4 +170,3 @@ class AgentTrainer:
             self.ou_epsilon
         )
         return self.agent, env_info, train_info
->>>>>>> research/ddpg
