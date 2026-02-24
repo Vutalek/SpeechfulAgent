@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 from typing import Dict, Any
 
 import numpy as np
@@ -97,4 +95,3 @@ class Agent(VersioningMixin):
 
         self.critic = Critic(data["environment"]["n_observations"])
         self.critic.load_state_dict(state_dict["critic"])
->>>>>>> research/ppo

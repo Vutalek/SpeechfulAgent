@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 from typing import List, Tuple
 
 import numpy as np
@@ -196,4 +194,3 @@ class AgentTrainer:
             self.learning_rate_critic
         )
         return self.agent, env_info, train_info
->>>>>>> research/ppo
