@@ -22,6 +22,25 @@ class EnvInfo:
     dict = asdict
 
 @dataclass
+class A3CTrainInfo:
+    # iterations count
+    n_iter: int
+    # objective bound
+    mean_objective: float
+    # gamma
+    gamma: float
+    # optimization
+    batch_size: int
+    n_steps: int
+    learning_rate: float
+    # clipping
+    clip_grad: float
+    # asynchronous
+    n_envs: int
+    
+    dict = asdict
+
+@dataclass
 class DQNTrainInfo:
     # iterations count
     n_iter: int
@@ -34,6 +53,7 @@ class DQNTrainInfo:
     replay_buffer_start_size: int
     # optimization
     batch_size: int
+    n_steps: int
     learning_rate: float
     # target network
     sync_target_frames: int
