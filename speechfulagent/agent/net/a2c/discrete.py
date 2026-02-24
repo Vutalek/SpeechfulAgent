@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 
-class DicreteA2C(nn.Module):
+class DiscreteA2C(nn.Module):
     def __init__(self, n_input: int, n_actions: int, hidden: int=128):
         super().__init__()
         self.backbone = nn.Sequential(
