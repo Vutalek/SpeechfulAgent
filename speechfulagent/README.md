@@ -9,8 +9,9 @@ speechfulagent
 │   __init__.py
 │
 ├───agent
+│       actor.py
 │       agent.py
-│       net.py
+│       critic.py
 │       __init__.py
 │
 ├───explainer
@@ -54,7 +55,11 @@ versioning.py - класс-примесь для версионирования.
 
 agent - пакет с модулями для построения агента.
 
+actor.py - нейронная сеть актора.
+
 agent.py - агент.
+
+critic.py - нейронная сеть критика.
 
 net.py - нейронная сеть для агента.
 
