@@ -1,1 +1,2 @@
-from .dqntrainer import AgentTrainer
+from .base_trainer import BaseTrainer
+from .dqn import BaseTrainer

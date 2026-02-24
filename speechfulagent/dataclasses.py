@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict
+from typing import Tuple, Any
 
 from numpy.typing import NDArray
 
@@ -18,7 +19,7 @@ class Experience:
 @dataclass
 class EnvInfo:
     name: str
-    n_observations: int
+    n_observations: int | Tuple[Any]
     n_actions: int
     
     dict = asdict
@@ -109,6 +110,8 @@ class DQNTrainInfo:
     epsilon_decay_final: float
 
     dict = asdict
+
+BaseTrainInfo = DQNTrainInfo | A3CTrainInfo | DDPGTrainInfo | PPOTrainInfo
 
 @dataclass
 class ExplainerTrainInfo:
