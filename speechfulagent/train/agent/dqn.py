@@ -20,7 +20,7 @@ class DQNTrainer(BaseTrainer):
         self,
         env: gym.Env,
         objective: float,
-        net: Optional[torch.nn.Module] = None,
+        net: Optional[torch.nn.Module]=None,
         gamma: float=0.99,
         replay_buffer_size: int=50000,
         replay_buffer_start_size: int=1000,
