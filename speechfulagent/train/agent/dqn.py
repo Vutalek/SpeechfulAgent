@@ -13,7 +13,6 @@ from speechfulagent.dataclasses import *
 from speechfulagent.agent import DQNAgent
 from speechfulagent.agent.net import MLPDQN
 from .replay_buffer import ReplayBuffer
-from .wrappers import RewardWrapper
 
 
 class DQNTrainer(BaseTrainer):
@@ -35,7 +34,7 @@ class DQNTrainer(BaseTrainer):
         logger=None
     ):
         super().__init__()
-        self.env = RewardWrapper(env)
+        self.env = env
         self.agent = DQNAgent(self.env)
 
         self.objective = objective
