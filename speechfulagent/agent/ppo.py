@@ -10,7 +10,7 @@ from speechfulagent.dataclasses import *
 from .base_agent import BaseAgent
 
 
-class Agent(BaseAgent):
+class PPOAgent(BaseAgent):
     """PPO agent"""
     def __init__(self, env: gym.Env, seed: int=70):
         super().__init__(env, seed)
