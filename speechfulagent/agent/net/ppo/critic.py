@@ -2,16 +2,15 @@ import torch
 import torch.nn as nn
 
 
-class Actor(nn.Module):
-    def __init__(self, input_shape: int, n_actions: int):
+class PPOCritic(nn.Module):
+    def __init__(self, n_input: int, hidden: int=128):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(input_shape, 400),
+            nn.Linear(n_input, hidden),
             nn.ReLU(),
-            nn.Linear(400, 300),
+            nn.Linear(hidden, hidden),
             nn.ReLU(),
-            nn.Linear(300, n_actions),
-            nn.Tanh()
+            nn.Linear(hidden, 1)
         )
 
     def forward(self, x: torch.Tensor):

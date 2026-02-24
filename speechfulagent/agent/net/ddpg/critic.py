@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 
 
-class Critic(nn.Module):
-    def __init__(self, input_shape: int, n_actions: int):
+class DDPGCritic(nn.Module):
+    def __init__(self, n_input: int, n_actions: int):
         super().__init__()
         self.obs = nn.Sequential(
-            nn.Linear(input_shape, 400),
+            nn.Linear(n_input, 400),
             nn.ReLU()
         )
         self.net = nn.Sequential(

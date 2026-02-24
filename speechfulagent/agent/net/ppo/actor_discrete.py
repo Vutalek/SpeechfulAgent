@@ -2,15 +2,15 @@ import torch
 import torch.nn as nn
 
 
-class Critic(nn.Module):
-    def __init__(self, input_shape: int):
+class DiscretePPOActor(nn.Module):
+    def __init__(self, n_input: int, n_actions: int, hidden: int=128):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(input_shape, 128),
+            nn.Linear(n_input, hidden),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(hidden, hidden),
             nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(hidden, n_actions)
         )
 
     def forward(self, x: torch.Tensor):

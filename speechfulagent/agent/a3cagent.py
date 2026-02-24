@@ -7,7 +7,7 @@ import gymnasium as gym
 from speechfulagent.types import *
 from speechfulagent.dataclasses import *
 from speechfulagent.versioning import VersioningMixin
-from .a3cnet import A2C
+from .net.a2c.discrete import A2C
 
 
 class Agent(VersioningMixin):

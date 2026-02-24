@@ -2,15 +2,15 @@ import torch
 import torch.nn as nn
 
 
-class Actor(nn.Module):
-    def __init__(self, input_shape: int, n_actions: int):
+class MLPDQN(nn.Module):
+    def __init__(self, n_input: int, n_actions: int, hidden: int=256):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(input_shape, 400),
+            nn.Linear(n_input, hidden),
             nn.ReLU(),
-            nn.Linear(256, 128),
+            nn.Linear(hidden, hidden),
             nn.ReLU(),
-            nn.Linear(128, n_actions)
+            nn.Linear(hidden, n_actions)
         )
 
     def forward(self, x: torch.Tensor):

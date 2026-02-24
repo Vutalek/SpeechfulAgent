@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 
 
-class Actor(nn.Module):
-    def __init__(self, input_shape: int, n_actions: int):
+class ContinuousDDPGActor(nn.Module):
+    def __init__(self, n_input: int, n_actions: int):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(input_shape, 400),
+            nn.Linear(n_input, 400),
             nn.ReLU(),
             nn.Linear(400, 300),
             nn.ReLU(),
