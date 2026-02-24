@@ -20,7 +20,7 @@ class Experience:
 class EnvInfo:
     name: str
     n_observations: int | Tuple[Any]
-    n_actions: int
+    n_actions: int | Tuple[Any]
     
     dict = asdict
 
