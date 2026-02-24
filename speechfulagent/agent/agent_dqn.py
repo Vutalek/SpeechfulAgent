@@ -61,7 +61,7 @@ class DQNAgent(BaseAgent):
         # checking if model is not None
         if self.net is None:
             raise RuntimeError("Nothing to save!")
-        torch.save(self.net, path + '/' + 'weights.dat')
+        torch.save(self.net, path + '/' + 'model.pth')
         env: EnvInfo = kwargs.get("env", EnvInfo)
         train: DQNTrainInfo = kwargs.get("train", DQNTrainInfo)
         info = {
@@ -73,7 +73,7 @@ class DQNAgent(BaseAgent):
         return info
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
-        self.net = torch.load(path + '/' + "weights.dat")
+        self.net = torch.load(path + '/' + "model.pth")
 
     def load_model(self, net: torch.nn.Module):
         self.net = net
