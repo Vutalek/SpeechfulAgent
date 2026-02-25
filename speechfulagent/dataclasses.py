@@ -33,7 +33,8 @@ class A3CTrainInfo:
     # gamma
     gamma: float
     # optimization
-    batch_size: int
+    worker_batch_size: int
+    train_batch_size: int
     n_steps: int
     learning_rate: float
     # clipping
