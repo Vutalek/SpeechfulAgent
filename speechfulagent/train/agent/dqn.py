@@ -174,4 +174,5 @@ class DQNTrainer(BaseTrainer):
             self.epsilon_decay_start,
             self.epsilon_decay_final
         )
+        self.agent.eval()
         return self.agent, env_info, train_info
