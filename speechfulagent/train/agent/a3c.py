@@ -99,7 +99,7 @@ class A3CTrainer(BaseTrainer):
                     self.n_steps,
                     self.worker_batch_size,
                     q,
-                    self.writer,
+                    self.writer is not None,
                     self.logger
                 )
             )
@@ -162,9 +162,14 @@ def worker_function(
     n_steps: int,
     batch_size: int,
     queue: mp.Queue,
-    writer: Optional[SummaryWriter]=None,
+    has_writer: bool=False,
     logger=None
 ):
+    if has_writer:
+        writer = SummaryWriter(comment=f"_p{pid}")
+    else:
+        writer = None
+
     local_env = deepcopy(env)
     local_agent = A2CAgent(local_env)
     local_agent.set_model(net)
@@ -188,8 +193,8 @@ def worker_function(
                     f"{pid}: done {len(total_rewards)} games, reward {m_reward:.3f}"
                 )
             if writer:
-                writer.add_scalar(f"{pid}_reward_100", m_reward, n_iter)
-                writer.add_scalar(f"{pid}_reward", reward, n_iter)
+                writer.add_scalar(f"reward_100", m_reward, n_iter)
+                writer.add_scalar(f"reward", reward, n_iter)
 
             if m_reward > objective:
                 if logger:
