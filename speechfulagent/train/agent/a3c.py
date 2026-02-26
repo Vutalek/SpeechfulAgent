@@ -150,6 +150,7 @@ class A3CTrainer(BaseTrainer):
             self.clip_grad,
             self.n_envs
         )
+        self.agent.eval()
         return self.agent, env_info, train_info
     
 def worker_function(
