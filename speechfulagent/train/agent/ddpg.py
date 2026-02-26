@@ -130,6 +130,7 @@ class DDPGTrainer(BaseTrainer):
         while True:
             n_iter += 1
             exp = self.agent.step()
+            self.agent.ou_epsilon *= 0.999
             self.replay_buffer.append(exp)
             if exp.done:
                 reward = self.agent.total_reward
@@ -160,9 +161,12 @@ class DDPGTrainer(BaseTrainer):
             q_v = self.critic(states, actions)
             next_actions_v = self.tgt_actor(next_states)
             next_q_v = self.tgt_critic(next_states, next_actions_v)
-            next_q_v[dones] = 0.0
-            q_ref_v = rewards.unsqueeze(dim=-1) + next_q_v * self.gamma
+            mask = (~dones).float().unsqueeze(-1)
+            q_ref_v = rewards.unsqueeze(-1) + mask * next_q_v * self.gamma
             critic_loss = F.mse_loss(q_v, q_ref_v.detach())
+            if self.writer:
+                self.writer.add_scalar("q values", q_v.mean().item(), n_iter)
+                self.writer.add_scalar("critic_loss", critic_loss.item(), n_iter)
             critic_loss.backward()
             self.critic_optim.step()
 
@@ -171,6 +175,8 @@ class DDPGTrainer(BaseTrainer):
             cur_actions_v = self.actor(states)
             actor_loss = -self.critic(states, cur_actions_v)
             actor_loss = actor_loss.mean()
+            if self.writer:
+                self.writer.add_scalar("actor_loss", actor_loss.item(), n_iter)
             actor_loss.backward()
             self.actor_optim.step()
 

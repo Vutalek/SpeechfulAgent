@@ -23,6 +23,9 @@ class DDPGAgent(BaseAgent):
         seed: int=70
     ):
         super().__init__(env, seed)
+        # check validity of env
+        if not self.is_act_cont:
+            raise RuntimeError("DDPG is not suitable for environments with discrete actions space.")
         self.actor: Optional[torch.nn.Module] = None
         self.critic: Optional[torch.nn.Module] = None
 
@@ -42,9 +45,6 @@ class DDPGAgent(BaseAgent):
         # checking if state is not None
         if self.env_state is None:
             raise RuntimeError("Uninitialized environment!")
-        # check validity of env
-        if not self.is_act_cont:
-            raise RuntimeError("DDPG is not suitable for environments with discrete actions space.")
     
         if self.is_obs_cont:
             state = torch.as_tensor(self.env_state)
@@ -53,7 +53,7 @@ class DDPGAgent(BaseAgent):
         state.unsqueeze_(0)
 
         mu = self.actor(state)
-        action = mu.squeeze(0).data.numpy()
+        action = mu.squeeze(0)
         if self.training and self.ou_enabled and self.ou_epsilon > 0.0:
             # Ornshtein-Uhlenbeck process
             if self.action_state is None:
