@@ -36,6 +36,7 @@ class DDPGTrainer(BaseTrainer):
         writer: Optional[SummaryWriter]=None,
         logger=None
     ):
+        super().__init__()
         self.env = env
         self.agent = DDPGAgent(self.env, ou_enable, ou_mu, ou_theta, ou_epsilon)
 
@@ -54,8 +55,8 @@ class DDPGTrainer(BaseTrainer):
         else:
             obs = self.agent.obs_n
 
-        if self.agent.obs_shape is not None:
-            act = self.agent.obs_shape[0]
+        if self.agent.act_shape is not None:
+            act = self.agent.act_shape[0]
         else:
             act = 0
             

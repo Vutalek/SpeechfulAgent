@@ -32,10 +32,10 @@ class A2CAgent(BaseAgent):
 
         if self.is_act_cont:
             mu, var, _ = self.net(state)
-            mu = mu.data.numpy()
+            mu = mu.squeeze().data.numpy()
             sigma = torch.sqrt(var).data.numpy()
             action = np.random.normal(mu, sigma)
-            action = np.clip(action, -1, 1).squeeze()
+            action = np.clip(action, -1, 1)
         else:
             policy, _ = self.net(state)
             probs = torch.softmax(policy, dim=-1)

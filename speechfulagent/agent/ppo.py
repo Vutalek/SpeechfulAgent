@@ -37,7 +37,7 @@ class PPOAgent(BaseAgent):
             logstd = self.actor.logstd.data.numpy()
             noise = np.random.normal(size=logstd.shape)
             action = mu + np.exp(logstd) * noise
-            action = np.clip(action, -1.0, 1.0).squeeze()
+            action = np.clip(action, -1.0, 1.0)
         else:
             policy = self.actor(state)
             probs = torch.softmax(policy, dim=-1)

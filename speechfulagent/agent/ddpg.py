@@ -53,7 +53,7 @@ class DDPGAgent(BaseAgent):
         state.unsqueeze_(0)
 
         mu = self.actor(state)
-        action = mu.data.numpy()
+        action = mu.squeeze(0).data.numpy()
         if self.training and self.ou_enabled and self.ou_epsilon > 0.0:
             # Ornshtein-Uhlenbeck process
             if self.action_state is None:
@@ -62,7 +62,7 @@ class DDPGAgent(BaseAgent):
             self.action_state += self.ou_sigma * np.random.normal(size=action.shape)
 
             action += self.ou_epsilon * self.action_state
-        action = np.clip(action, -1.0, 1.0).squeeze()
+        action = np.clip(action, -1.0, 1.0)
         
         next_state, reward, is_done, is_trunc, _ = self.env.step(action)
         self.total_reward += float(reward)
