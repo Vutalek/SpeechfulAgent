@@ -14,6 +14,9 @@ class DQNAgent(BaseAgent):
     """DQN agent. Only works in environments with discrete action spaces."""
     def __init__(self, env: gym.Env, seed: int=70):
         super().__init__(env, seed)
+        # check validity of env
+        if self.is_act_cont:
+            raise RuntimeError("DQN is not suitable for environments with continuous actions space.")
         self.net: Optional[torch.nn.Module] = None
         self.epsilon = 0.0
     
@@ -24,9 +27,6 @@ class DQNAgent(BaseAgent):
         # checking if state is not None
         if self.env_state is None:
             raise RuntimeError("Uninitialized environment!")
-        # check validity of env
-        if self.is_act_cont:
-            raise RuntimeError("DQN is not suitable for environments with continuous actions space.")
         
         # exploration
         if self.training and np.random.random() < self.epsilon:
