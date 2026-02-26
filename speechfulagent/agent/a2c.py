@@ -35,7 +35,7 @@ class A2CAgent(BaseAgent):
             mu = mu.data.numpy()
             sigma = torch.sqrt(var).data.numpy()
             action = np.random.normal(mu, sigma)
-            action = np.clip(action, -1, 1)
+            action = np.clip(action, -1, 1).squeeze()
         else:
             policy, _ = self.net(state)
             probs = torch.softmax(policy, dim=-1)
@@ -73,7 +73,7 @@ class A2CAgent(BaseAgent):
         return info
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
-        self.net = torch.load(path + '/' + "model.pth")
+        self.net = torch.load(path + '/' + "model.pth", weights_only=False)
 
     def set_model(self, net: torch.nn.Module):
         """Sets local model for agent"""

@@ -79,7 +79,7 @@ class DDPGTrainInfo:
     batch_size: int
     learning_rate: float
     # target network
-    sync_target_frames: int
+    alpha_sync: float
     # Ornshtein-Uhlenbeck process
     ou_enabled: bool
     ou_mu: float

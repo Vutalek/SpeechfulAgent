@@ -62,7 +62,7 @@ class DDPGAgent(BaseAgent):
             self.action_state += self.ou_sigma * np.random.normal(size=action.shape)
 
             action += self.ou_epsilon * self.action_state
-        action = np.clip(action, -1.0, 1.0)
+        action = np.clip(action, -1.0, 1.0).squeeze()
         
         next_state, reward, is_done, is_trunc, _ = self.env.step(action)
         self.total_reward += float(reward)
@@ -103,7 +103,7 @@ class DDPGAgent(BaseAgent):
         return info
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
-        models = torch.load(path + '/' + "model.pth")
+        models = torch.load(path + '/' + "model.pth", weights_only=False)
         self.actor = models["actor"]
         self.critic = models["critic"]
 
@@ -113,4 +113,4 @@ class DDPGAgent(BaseAgent):
 
     def set_critic(self, critic: torch.nn.Module):
         """Sets local critic for agent"""
-        self.actor = critic
+        self.critic = critic

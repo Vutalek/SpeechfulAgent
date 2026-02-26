@@ -73,7 +73,7 @@ class DQNAgent(BaseAgent):
         return info
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
-        self.net = torch.load(path + '/' + "model.pth")
+        self.net = torch.load(path + '/' + "model.pth", weights_only=False)
 
     def set_model(self, net: torch.nn.Module):
         """Sets local model for agent"""

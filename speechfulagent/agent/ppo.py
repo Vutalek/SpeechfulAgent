@@ -37,7 +37,7 @@ class PPOAgent(BaseAgent):
             logstd = self.actor.logstd.data.numpy()
             noise = np.random.normal(size=logstd.shape)
             action = mu + np.exp(logstd) * noise
-            action = np.clip(action, -1.0, 1.0)
+            action = np.clip(action, -1.0, 1.0).squeeze()
         else:
             policy = self.actor(state)
             probs = torch.softmax(policy, dim=-1)
@@ -82,7 +82,7 @@ class PPOAgent(BaseAgent):
         return info
 
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
-        models = torch.load(path + '/' + "weights.dat")
+        models = torch.load(path + '/' + "weights.dat", weights_only=False)
         self.actor = models["actor"]
 
         self.critic = models["critic"]
