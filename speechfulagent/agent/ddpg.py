@@ -42,6 +42,9 @@ class DDPGAgent(BaseAgent):
         # checking if state is not None
         if self.env_state is None:
             raise RuntimeError("Uninitialized environment!")
+        # check validity of env
+        if not self.is_act_cont:
+            raise RuntimeError("DDPG is not suitable for environments with discrete actions space.")
     
         if self.is_obs_cont:
             state = torch.as_tensor(self.env_state)
@@ -59,11 +62,7 @@ class DDPGAgent(BaseAgent):
             self.action_state += self.ou_sigma * np.random.normal(size=action.shape)
 
             action += self.ou_epsilon * self.action_state
-        if self.is_act_cont:
-            action = np.clip(action, -1.0, 1.0)
-        else:
-            _, act_idx = torch.max(action, dim=1)
-            action = int(act_idx.item())
+        action = np.clip(action, -1.0, 1.0)
         
         next_state, reward, is_done, is_trunc, _ = self.env.step(action)
         self.total_reward += float(reward)

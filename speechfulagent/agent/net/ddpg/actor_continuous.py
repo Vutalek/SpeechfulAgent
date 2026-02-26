@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-class ContinuousDDPGActor(nn.Module):
+class DDPGActor(nn.Module):
     def __init__(self, n_input: int, n_actions: int):
         super().__init__()
         self.net = nn.Sequential(
