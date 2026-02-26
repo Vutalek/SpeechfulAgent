@@ -33,6 +33,7 @@ class A3CTrainer(BaseTrainer):
         writer: Optional[SummaryWriter]=None,
         logger=None
     ):
+        super().__init__()
         self.env = env
         self.agent = A2CAgent(env)
 
