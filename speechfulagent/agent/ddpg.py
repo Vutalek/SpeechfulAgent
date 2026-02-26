@@ -45,7 +45,7 @@ class DDPGAgent(BaseAgent):
         # checking if state is not None
         if self.env_state is None:
             raise RuntimeError("Uninitialized environment!")
-    
+
         if self.is_obs_cont:
             state = torch.as_tensor(self.env_state)
         else:

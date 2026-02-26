@@ -130,7 +130,7 @@ class DDPGTrainer(BaseTrainer):
         while True:
             n_iter += 1
             exp = self.agent.step()
-            self.agent.ou_epsilon *= 0.999
+            # self.agent.ou_epsilon *= 0.999
             self.replay_buffer.append(exp)
             if exp.done:
                 reward = self.agent.total_reward
