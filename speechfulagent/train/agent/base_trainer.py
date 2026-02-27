@@ -6,8 +6,8 @@ from speechfulagent.dataclasses import EnvInfo, BaseTrainInfo
 
 
 class BaseTrainer(ABC):
-    def __init__(self):
-        pass
+    def __init__(self, seed: int):
+        self.seed = seed
     
     @abstractmethod
     def train(self) -> Tuple[BaseAgent, EnvInfo, BaseTrainInfo]:

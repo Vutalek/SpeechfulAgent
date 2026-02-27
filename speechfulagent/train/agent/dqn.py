@@ -31,11 +31,12 @@ class DQNTrainer(BaseTrainer):
         epsilon_decay_start: float=1.0,
         epsilon_decay_final: float=0.01,
         writer: Optional[SummaryWriter]=None,
-        logger=None
+        logger=None,
+        seed: int=70
     ):
-        super().__init__()
+        super().__init__(seed)
         self.env = env
-        self.agent = DQNAgent(self.env)
+        self.agent = DQNAgent(self.env, self.seed)
 
         self.objective = objective
 
@@ -172,7 +173,8 @@ class DQNTrainer(BaseTrainer):
             self.sync_target_frames,
             self.epsilon_decay_last_frame,
             self.epsilon_decay_start,
-            self.epsilon_decay_final
+            self.epsilon_decay_final,
+            self.seed
         )
         self.agent.eval()
         return self.agent, env_info, train_info

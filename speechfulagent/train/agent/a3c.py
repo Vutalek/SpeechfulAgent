@@ -31,11 +31,12 @@ class A3CTrainer(BaseTrainer):
         train_batch_size: int=2,
         learning_rate: float=1e-3,
         writer: Optional[SummaryWriter]=None,
-        logger=None
+        logger=None,
+        seed: int=70
     ):
-        super().__init__()
+        super().__init__(seed)
         self.env = env
-        self.agent = A2CAgent(env)
+        self.agent = A2CAgent(env, self.seed)
 
         self.objective = objective
 
@@ -148,7 +149,8 @@ class A3CTrainer(BaseTrainer):
             self.n_steps,
             self.learning_rate,
             self.clip_grad,
-            self.n_envs
+            self.n_envs,
+            self.seed
         )
         self.agent.eval()
         return self.agent, env_info, train_info

@@ -41,6 +41,8 @@ class A3CTrainInfo:
     clip_grad: float
     # asynchronous
     n_envs: int
+
+    seed: int
     
     dict = asdict
 
@@ -61,6 +63,8 @@ class PPOTrainInfo:
     batch_size: int
     learning_rate_actor: float
     learning_rate_critic: float
+
+    seed: int
 
     dict = asdict
 
@@ -87,6 +91,8 @@ class DDPGTrainInfo:
     ou_sigma: float
     ou_epsilon: float
 
+    seed: int
+
     dict = asdict
 
 @dataclass
@@ -109,6 +115,8 @@ class DQNTrainInfo:
     epsilon_decay_last_frame: int
     epsilon_decay_start: float
     epsilon_decay_final: float
+
+    seed: int
 
     dict = asdict
 

@@ -34,11 +34,12 @@ class DDPGTrainer(BaseTrainer):
         ou_sigma: float=0.2,
         ou_epsilon: float=1.0,
         writer: Optional[SummaryWriter]=None,
-        logger=None
+        logger=None,
+        seed: int=70
     ):
-        super().__init__()
+        super().__init__(seed)
         self.env = env
-        self.agent = DDPGAgent(self.env, ou_enable, ou_mu, ou_theta, ou_epsilon)
+        self.agent = DDPGAgent(self.env, ou_enable, ou_mu, ou_theta, ou_sigma, ou_epsilon, self.seed)
 
         self.objective = objective
 
@@ -202,7 +203,8 @@ class DDPGTrainer(BaseTrainer):
             self.ou_mu,
             self.ou_theta,
             self.ou_sigma,
-            self.ou_epsilon
+            self.ou_epsilon,
+            self.seed
         )
         self.agent.eval()
         return self.agent, env_info, train_info
