@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import numpy as np
 import torch
@@ -7,27 +7,34 @@ import torch.optim as optim
 from torch.utils.tensorboard.writer import SummaryWriter
 import gymnasium as gym
 
-from .wrappers import RewardWrapper
-from speechfulagent.agent import Agent, Actor, Critic
+from .base_trainer import BaseTrainer
 from speechfulagent.dataclasses import *
+from speechfulagent.agent import PPOAgent
+from speechfulagent.agent.net import DiscretePPOActor, ContinuousPPOActor, PPOCritic
 
 
-class AgentTrainer:
+class PPOTrainer(BaseTrainer):
     def __init__(
         self,
         env: gym.Env,
         objective: float,
-        gamma: float,
-        gae_lambda: float,
-        trajectory_size: int,
-        epochs: int,
-        eps: float,
-        batch_size: int,
-        learning_rate_actor: float,
-        learning_rate_critic: float,
-        logger = None
+        actor: Optional[torch.nn.Module]=None,
+        critic: Optional[torch.nn.Module]=None,
+        gamma: float=0.95,
+        gae_lambda: float=0.95,
+        trajectory_size: int=2049,
+        epochs: int=10,
+        eps: float=0.2,
+        batch_size: int=64,
+        learning_rate_actor: float=0.0003,
+        learning_rate_critic: float=0.0003,
+        writer: Optional[SummaryWriter]=None,
+        logger=None,
+        seed: int=70
     ):
-        self.env = RewardWrapper(env)
+        super().__init__(seed)
+        self.env = env
+        self.agent = PPOAgent(self.env, self.seed)
 
         self.objective = objective
 
@@ -39,26 +46,53 @@ class AgentTrainer:
         self.epochs = epochs
         self.eps = eps
 
-        self.actor_net = Actor(env.observation_space.n, env.action_space.n)
-        self.critic_net = Critic(env.observation_space.n)
-        self.optim_actor = optim.Adam(params=self.actor_net.parameters(), lr=learning_rate_actor)
-        self.optim_critic = optim.Adam(params=self.critic_net.parameters(), lr=learning_rate_critic)
+        if self.agent.is_obs_cont:
+            if self.agent.obs_shape is not None:
+                obs = self.agent.obs_shape[0]
+            else:
+                obs = 0
+        else:
+            obs = self.agent.obs_n
+        if self.agent.is_act_cont:
+            if self.agent.act_shape is not None:
+                act = self.agent.act_shape[0]
+            else:
+                act = 0
+        else:
+            act = self.agent.act_n
+
+        if actor is not None:
+            self.actor = actor
+        else:
+            if self.agent.is_act_cont:
+                self.actor = ContinuousPPOActor(obs, act)
+            else:
+                self.actor = DiscretePPOActor(obs, act)
+        
+        if critic is not None:
+            self.critic = critic
+        else:
+            self.critic = PPOCritic(obs)
+
+        self.actor_optim = optim.Adam(params=self.actor.parameters(), lr=learning_rate_actor)
+        self.critic_optim = optim.Adam(params=self.critic.parameters(), lr=learning_rate_critic)
         self.learning_rate_actor = learning_rate_actor
         self.learning_rate_critic = learning_rate_critic
         self.batch_size = batch_size
 
+        self.writer = writer
         self.logger = logger
 
-        self.agent = Agent()
-        self.agent.actor = self.actor_net
-        self.agent.critic = self.critic_net
+        self.agent.set_actor(self.actor)
+        self.agent.set_critic(self.critic)
+        self.agent.train()
 
     def _reference_advantage(
         self, 
         trajectory: List[Experience], 
         states: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        vals = self.critic_net(states)
+        vals = self.critic(states)
         vals = vals.squeeze().data.numpy()
         # generalized advantage estimation
         last_gae = 0.0
@@ -87,20 +121,26 @@ class AgentTrainer:
         for e in batch:
             states.append(e.state)
             actions.append(e.action)
-        states_t = F.one_hot(torch.as_tensor(states), self.env.observation_space.n)
-        actions_t = torch.as_tensor(actions)
+        if self.agent.is_obs_cont:
+            states_t = torch.as_tensor(np.array(states))
+        else:
+            states_t = F.one_hot(torch.as_tensor(states), self.agent.obs_n)
+
+        if self.agent.is_act_cont:
+            actions_t = torch.as_tensor(np.array(actions))
+        else:
+            actions_t = [int(e) for e in actions]
+            actions_t = torch.LongTensor(actions)
+
         return states_t, actions_t
     
-    def train(self) -> Tuple[Agent, EnvInfo, AgentTrainInfo]:
+    def train(self) -> Tuple[PPOAgent, EnvInfo, PPOTrainInfo]:
         n_iter = 0
         total_rewards = []
         self.agent.reset()
-        state, _ = self.env.reset()
-        self.agent.init_state(state)
-        writer = SummaryWriter()
         while True:
             n_iter += 1
-            exp = self.agent.step(self.env)
+            exp = self.agent.step()
 
             self.trajectory.append(exp)
             if exp.done:
@@ -111,8 +151,9 @@ class AgentTrainer:
                     self.logger.info(
                         f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}"
                     )
-                writer.add_scalar("reward_100", m_reward, n_iter)
-                writer.add_scalar("reward", reward, n_iter)
+                if self.writer:
+                    self.writer.add_scalar("reward_100", m_reward, n_iter)
+                    self.writer.add_scalar("reward", reward, n_iter)
 
                 if m_reward > self.objective:
                     if self.logger:
@@ -120,20 +161,24 @@ class AgentTrainer:
                     break
 
                 self.agent.reset()
-                state, _ = self.env.reset()
-                self.agent.init_state(state)
             
             if len(self.trajectory) < self.trajectory_size:
                 continue
             
             states, actions = self._batch_to_tensors(self.trajectory)
             advantages, references = self._reference_advantage(self.trajectory, states)
-            logits = self.actor_net(states)
-            logprob_old = torch.gather(
-                torch.log_softmax(logits, dim=-1),
-                1,
-                actions.unsqueeze(0).T
-            ).squeeze()
+            if self.agent.is_act_cont:
+                mu = self.actor(states)
+                p1 = - ((mu - actions) ** 2) / (2*torch.exp(self.actor.logstd).clamp(min=1e-3))
+                p2 = - torch.log(torch.sqrt(2 * torch.pi * torch.exp(self.actor.logstd)))
+                logprob_old = p1 + p2
+            else:
+                logits = self.actor(states)
+                logprob_old = torch.gather(
+                    torch.log_softmax(logits, dim=-1),
+                    1,
+                    actions.unsqueeze(0).T
+                ).squeeze()
 
             # standartization
             advantages = advantages - torch.mean(advantages)
@@ -150,38 +195,44 @@ class AgentTrainer:
                     batch_logprob_old = logprob_old[batch_offset:batch_end]
 
                     # critic
-                    self.optim_critic.zero_grad()
-                    value = self.critic_net(batch_states)
+                    self.critic_optim.zero_grad()
+                    value = self.critic(batch_states)
                     loss = F.mse_loss(value.squeeze(), batch_refs)
                     loss.backward()
-                    self.optim_critic.step()
+                    self.critic_optim.step()
 
                     # actor
-                    self.optim_actor.zero_grad()
-                    batch_logits = self.actor_net(batch_states)
-                    batch_logprob = torch.gather(
-                        torch.log_softmax(batch_logits, dim=-1),
-                        1,
-                        batch_actions.unsqueeze(0).T
-                    ).squeeze()
+                    self.actor_optim.zero_grad()
+                    if self.agent.is_act_cont:
+                        batch_mu = self.actor(batch_states)
+                        p1 = - ((batch_mu - batch_actions) ** 2) / (2*torch.exp(self.actor.logstd).clamp(min=1e-3))
+                        p2 = - torch.log(torch.sqrt(2 * torch.pi * torch.exp(self.actor.logstd)))
+                        batch_logprob = p1 + p2
+                    else:
+                        batch_logits = self.actor(batch_states)
+                        batch_logprob = torch.gather(
+                            torch.log_softmax(batch_logits, dim=-1),
+                            1,
+                            batch_actions.unsqueeze(0).T
+                        ).squeeze()
                     ratio = torch.exp(batch_logprob - batch_logprob_old)
                     surr_obj = batch_advs * ratio
                     clip_ratio = torch.clamp(ratio, 1.0 - self.eps, 1.0 + self.eps)
                     clip_surr_obj = batch_advs * clip_ratio
                     loss_policy = -torch.min(surr_obj, clip_surr_obj).mean()
                     loss_policy.backward()
-                    self.optim_actor.step()
-                    writer.add_scalar("actor loss", loss_policy, n_iter)
-                    writer.add_scalar("critic loss", loss, n_iter)
+                    self.actor_optim.step()
+                    if self.writer:
+                        self.writer.add_scalar("actor loss", loss_policy, n_iter)
+                        self.writer.add_scalar("critic loss", loss, n_iter)
             self.trajectory.clear()
-        writer.close()
 
         env_info = EnvInfo(
             self.env.spec.id,
-            int(self.env.observation_space.n),
-            int(self.env.action_space.n)
+            self.agent.obs_shape if self.agent.is_obs_cont else self.agent.obs_n,
+            self.agent.act_shape if self.agent.is_act_cont else self.agent.act_n
         )
-        train_info = AgentTrainInfo(
+        train_info = PPOTrainInfo(
             n_iter,
             self.objective,
             self.gamma,
@@ -191,6 +242,8 @@ class AgentTrainer:
             self.eps,
             self.batch_size,
             self.learning_rate_actor,
-            self.learning_rate_critic
+            self.learning_rate_critic,
+            self.seed
         )
+        self.agent.eval()
         return self.agent, env_info, train_info

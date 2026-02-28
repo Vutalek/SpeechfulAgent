@@ -33,7 +33,7 @@ class PPOAgent(BaseAgent):
 
         if self.is_act_cont:
             mu = self.actor(state)
-            mu = mu.data.numpy()
+            mu = mu.squeeze().data.numpy()
             logstd = self.actor.logstd.data.numpy()
             noise = np.random.normal(size=logstd.shape)
             action = mu + np.exp(logstd) * noise
@@ -93,4 +93,4 @@ class PPOAgent(BaseAgent):
 
     def set_critic(self, critic: torch.nn.Module):
         """Sets local critic for agent"""
-        self.actor = critic
+        self.critic = critic
