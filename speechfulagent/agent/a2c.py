@@ -32,8 +32,8 @@ class A2CAgent(BaseAgent):
 
         if self.is_act_cont:
             mu, var, _ = self.net(state)
-            mu = mu.squeeze().data.numpy()
-            sigma = torch.sqrt(var).data.numpy()
+            mu = mu.squeeze(0).data.numpy()
+            sigma = torch.sqrt(var).squeeze(0).data.numpy()
             action = np.random.normal(mu, sigma)
             action = np.clip(action, -1, 1)
         else:

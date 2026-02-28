@@ -15,13 +15,15 @@ class ContinuousA2C(nn.Module):
         self.mu = nn.Sequential(
             nn.Linear(hidden, hidden),
             nn.ReLU(),
-            nn.Linear(hidden, n_actions)
+            nn.Linear(hidden, n_actions),
+            nn.Tanh()
         )
 
         self.var = nn.Sequential(
             nn.Linear(hidden, hidden),
             nn.ReLU(),
-            nn.Linear(hidden, n_actions)
+            nn.Linear(hidden, n_actions),
+            nn.Softplus()
         )
 
         self.critic = nn.Sequential(
