@@ -1,7 +1,7 @@
 from typing import Any, Dict
 import torch
 
-from .preprocessing import Tokenizer
+from .tokenizer import Tokenizer
 from .transformer import ExplainerTransformer
 from speechfulagent.dataclasses import *
 from speechfulagent.versioning import VersioningMixin

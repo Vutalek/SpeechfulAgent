@@ -7,7 +7,7 @@ from torch.optim import Adam
 from torch.nn import CrossEntropyLoss
 
 from .dataset import SequenceExplanationsDataset
-from speechfulagent.explainer.preprocessing import Tokenizer
+from speechfulagent.explainer.tokenizer import Tokenizer
 from speechfulagent.explainer.transformer import ExplainerTransformer
 from speechfulagent.explainer import Explainer
 from speechfulagent.dataclasses import *

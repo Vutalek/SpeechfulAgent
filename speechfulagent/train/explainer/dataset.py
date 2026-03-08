@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset
 
 from speechfulagent.dataclasses import Experience
-from speechfulagent.explainer.preprocessing import Tokenizer, embed_sequence
+from speechfulagent.explainer.tokenizer import Tokenizer, embed_sequence
 
 
 class SequenceExplanationsDataset(Dataset):
