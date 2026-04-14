@@ -216,11 +216,11 @@ if __name__ == "__main__":
     se = StateEncoder().to(device)
     se.train()
     se_optim = optim.Adam(se.parameters(), lr=1e-3)
-    se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=1000)
+    se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=100)
 
     loss_history = []
     logger.info("start training")
-    for epoch in range(1000):
+    for epoch in range(100):
         for states, actions, rewards, explanation in dataloader:
             start = time.time()
 
