@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import random_split
 from numpy.typing import NDArray
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from dotenv import load_dotenv
@@ -211,7 +212,9 @@ if __name__ == "__main__":
         startas = explainer.transformer.model.embed_tokens(torch.LongTensor([[151644, 77091, 198]]).to(device))
 
     dataset = ExperienceDataset("new_dataset", tokenizer, device=device)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    train_set, validation_set = random_split(dataset, [35, 5])
+    train_loader = DataLoader(train_set, batch_size=1, shuffle=True)
+    validation_loader = DataLoader(validation_set, batch_size=1, shuffle=False)
 
     se = StateEncoder().to(device)
     se.train()
@@ -219,9 +222,12 @@ if __name__ == "__main__":
     se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=100)
 
     loss_history = []
+    validation_history = []
     logger.info("start training")
     for epoch in range(100):
-        for states, actions, rewards, explanation in dataloader:
+        # training
+        history = []
+        for states, actions, rewards, explanation in train_loader:
             start = time.time()
 
             states = states.squeeze(0)
@@ -244,12 +250,40 @@ if __name__ == "__main__":
             sum_loss = sum(loss[1:])
             sum_loss.backward()
             se_optim.step()
-            se_scheduler.step()
 
-            logger.info(f"epoch: {epoch} loss: {sum_loss.item():.4f}, time: {time.time() - start:.2f}s")
-            loss_history.append(sum_loss.item())
+            logger.info(f"TRAIN epoch: {epoch} loss: {sum_loss.item():.4f}, time: {time.time() - start:.2f}s")
+            history.append(sum_loss.item())
+        se_scheduler.step()
+        loss_history.append(history)
+
+        # validation
+        history = []
+        with torch.no_grad():
+            for states, actions, rewards, explanation in validation_loader:
+                states = states.squeeze(0)
+                actions = actions.squeeze(0)
+                rewards = rewards.squeeze(0)
+                explanation = explanation.squeeze(0)
+
+                state_embeds = se.forward(states, actions, rewards)
+                _, _, loss = explainer.generate_with_loss(
+                    state_embeds.unsqueeze(0).to(dtype=torch.bfloat16), 
+                    startage, endage, startas,
+                    explanation,
+                    max_length=35,
+                    temperature=0.6
+                )
+
+                if not loss:
+                    continue
+                sum_loss = sum(loss[1:])
+
+                logger.info(f"VALIDATION epoch: {epoch} loss: {sum_loss.item():.4f}")
+            validation_history.append(history)
     with open("weights.pth", "wb") as f:
         torch.save(se.state_dict(), f)
     with open("loss_history.json", "wt") as f:
         json.dump(loss_history, f)
+    with open("validation_history.json", "wt") as f:
+        json.dump(validation_history, f)
     logger.info("training finished")
