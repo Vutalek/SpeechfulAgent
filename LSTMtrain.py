@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data import random_split
 from numpy.typing import NDArray
@@ -84,7 +85,6 @@ class ExperienceDataset(Dataset):
         explanation = torch.as_tensor(tok_exp, dtype=torch.long).to(self.device),
         return states, actions, rewards, explanation[0]
     
-# TODO: add regularization to prevent overfitting
 class StateEncoder(nn.Module):
     def __init__(
         self,
@@ -219,14 +219,18 @@ if __name__ == "__main__":
 
     se = StateEncoder().to(device)
     se.train()
-    se_optim = optim.Adam(se.parameters(), lr=1e-3)
+    se_optim = optim.AdamW(se.parameters(), lr=1e-3, weight_decay=5e-4)
     se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=100)
 
     loss_history = []
     validation_history = []
+    best_validation_loss = None
+    early_stopping_counter = 0
+    early_stopping_patience = 7
     logger.info("start training")
     for epoch in range(100):
         # training
+        se.train()
         history = []
         for states, actions, rewards, explanation in train_loader:
             start = time.time()
@@ -250,14 +254,16 @@ if __name__ == "__main__":
                 continue
             sum_loss = sum(loss[1:])
             sum_loss.backward()
+            total_norm = clip_grad_norm_(se.parameters(), max_norm=float('inf'), norm_type=2)
             se_optim.step()
-            # TODO: add gradient info to logger
-            logger.info(f"TRAIN epoch: {epoch} loss: {sum_loss.item():.4f}, time: {time.time() - start:.2f}s")
+
+            logger.info(f"TRAIN epoch: {epoch} loss: {sum_loss.item():.4f}, grad_norm: {total_norm.item()}, lr: {se_scheduler.get_last_lr()[0]:.6f}, time: {time.time() - start:.2f}s")
             history.append(sum_loss.item())
         se_scheduler.step()
         loss_history.append(history)
 
         # validation
+        se.eval()
         history = []
         with torch.no_grad():
             for states, actions, rewards, explanation in validation_loader:
@@ -282,6 +288,17 @@ if __name__ == "__main__":
                 logger.info(f"VALIDATION epoch: {epoch} loss: {sum_loss.item():.4f}")
                 history.append(sum_loss.item())
             validation_history.append(history)
+
+            #early_stopping
+            current_loss = sum(history) / len(history)
+            if best_validation_loss is None or current_loss < best_validation_loss:
+                best_validation_loss = current_loss
+                early_stopping_counter = 0
+            else:
+                early_stopping_counter += 1
+            if early_stopping_counter >= early_stopping_patience:
+                logger.warning("early stopping triggered")
+                break
     with open("weights.pth", "wb") as f:
         torch.save(se.state_dict(), f)
     with open("loss_history.json", "wt") as f:
