@@ -1,0 +1,255 @@
+import json
+from dataclasses import dataclass, asdict
+import time
+import logging
+logging.basicConfig(level=logging.NOTSET, format="[%(levelname)s]: %(message)s")
+logger = logging.getLogger("train")
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+from numpy.typing import NDArray
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from dotenv import load_dotenv
+load_dotenv()
+
+
+@dataclass
+class Experience:
+    state: int | NDArray
+    action: int | NDArray
+    reward: float
+    next_state: int | NDArray
+    done: bool
+
+    dict = asdict
+
+def json_to_episode(file: str) -> list[Experience]:
+    with open(file, "rt") as f:
+        episode = json.load(f)
+    experiences = []
+    for step in episode:
+        experiences.append(
+            Experience(
+                state=step["state"],
+                action=step["action"],
+                reward=step["reward"],
+                next_state=None,
+                done=False
+            )
+        )
+    experiences[-2].done = True
+    for i in range(len(experiences)-1):
+        experiences[i].next_state = experiences[i+1].state
+    return experiences[:-1]
+
+def proccess_folder(path: str):
+    episodes = []
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    for expl in data:
+        ep_folder = expl["folder"]
+        ep_file = expl["filename"]
+        episode = json_to_episode(ep_folder + "/" + ep_file)
+        episodes.append(
+            {
+                "episode": episode,
+                "explanation": expl["explanation"]
+            }
+        )
+    return episodes
+
+class ExperienceDataset(Dataset):
+    def __init__(self, folder: str, tokenizer, device: str="cpu"):
+        self.episodes = []
+        self.episodes.extend(proccess_folder(folder + "/explanations_bad.json"))
+        self.episodes.extend(proccess_folder(folder + "/explanations_good.json"))
+        self.tokenizer = tokenizer
+        self.device = device
+
+    def __len__(self):
+        return len(self.episodes)
+
+    def __getitem__(self, idx):
+        entry = self.episodes[idx]
+        episode = entry["episode"]
+        text = entry["explanation"]
+        states = torch.as_tensor([exp.state for exp in episode], dtype=torch.long).to(self.device)
+        actions = torch.as_tensor([exp.action for exp in episode], dtype=torch.long).to(self.device)
+        rewards = torch.as_tensor([exp.reward for exp in episode], dtype=torch.float32).to(self.device)
+        tok_exp = self.tokenizer.encode(text)
+        explanation = torch.as_tensor(tok_exp, dtype=torch.long).to(self.device),
+        return states, actions, rewards, explanation[0]
+    
+class StateEncoder(nn.Module):
+    def __init__(
+        self,
+        module_size: int=32,
+        hidden_size: int=512,
+        projected_size: int=2048,
+    ):
+        super().__init__()
+        self.module_size = module_size
+        self.hidden_size = hidden_size
+        self.projected_size = projected_size
+
+        self.state_mod = nn.Linear(16, module_size)
+        self.action_mod = nn.Linear(4, module_size)
+        self.reward_mod = nn.Linear(1, module_size)
+
+        self.lstm = nn.LSTM(input_size=3*module_size, hidden_size=hidden_size, batch_first=True)
+        self.norm = nn.LayerNorm(hidden_size)
+        self.project = nn.Linear(hidden_size, projected_size)
+
+    def forward(self, states, actions, rewards):
+        states = self.state_mod(F.one_hot(states, 16).to(dtype=torch.float32))
+        actions = self.action_mod(F.one_hot(actions, 4).to(dtype=torch.float32))
+        rewards = self.reward_mod(rewards.view((-1, 1)))
+        exp_tensor = torch.concat([states, actions, rewards], dim=1)
+        
+        lstm_out, (h_n, c_n) = self.lstm(exp_tensor)
+        normed = self.norm(lstm_out)
+        projected = self.project(normed)
+        return projected
+    
+class Explainer():
+    def __init__(self, transformer):
+        self.transformer = transformer
+
+    def _apply_top_k(self, logits: torch.Tensor, k: int=0) -> torch.Tensor:
+        if k == 0:
+            return logits
+        top_logits, top_ids = torch.topk(logits, k, dim=-1)
+        mask = torch.ones_like(logits, dtype=torch.bool)
+        mask[top_ids] = False
+        return torch.masked_fill(logits, mask=mask, value=float("-inf"))
+    
+    def _apply_temperature(self, logits: torch.Tensor, temperature: float) -> torch.Tensor:
+        return logits / temperature
+    
+    def _greedy_sampling(self, logits: torch.Tensor) -> int:
+        val, ind = torch.max(logits, dim=0)
+        return int(ind.item())
+    
+    def _random_sampling(self, logits: torch.Tensor) -> int:
+        probs = torch.softmax(logits, dim=-1)
+        return int(torch.multinomial(probs, 1).item())
+    
+    def generate_with_loss(
+        self,
+        input_embeds: torch.Tensor,
+        startage,
+        endage,
+        startas,
+        ground_truth,
+        max_length: int=32,
+        temperature: float=0.0,
+        top_k: int=0,
+    ):
+        if self.transformer is None:
+            raise RuntimeError("Model not loaded!")
+        
+        tokens = []
+        loss = []
+        
+        prefix_len = startage.shape[1] + input_embeds.shape[1] + endage.shape[1] + startas.shape[1]
+
+        ignore_index = -100
+        full_labels = torch.full((prefix_len + len(ground_truth),), ignore_index, dtype=torch.long, device=ground_truth.device)
+        full_labels[prefix_len:] = ground_truth
+        
+        current_input = torch.cat([
+            startage.squeeze(0), 
+            input_embeds.squeeze(0),
+            endage.squeeze(0),
+            startas.squeeze(0)
+        ]).unsqueeze(0)
+        
+        for _ in range(max_length):
+            current_labels = full_labels[:current_input.shape[1]].unsqueeze(0)
+
+            outputs = self.transformer.forward(
+                inputs_embeds=current_input.to(torch.bfloat16), 
+                labels=current_labels, 
+                use_cache=False
+            )
+
+            if outputs.loss is not None:
+                loss.append(outputs.loss)
+
+            next_token_logits = outputs.logits[0, -1, :]
+
+            if temperature == 0.0:
+                next_token = self._greedy_sampling(next_token_logits)
+            else:
+                next_token_logits = self._apply_temperature(next_token_logits, temperature)
+                next_token_logits = self._apply_top_k(next_token_logits, top_k)
+                next_token = self._random_sampling(next_token_logits)
+            tokens.append(next_token)
+
+            next_token_embed = self.transformer.model.embed_tokens(
+                torch.LongTensor([[next_token]]).to(self.transformer.device)
+            ).squeeze(0)
+
+            current_input = torch.cat([current_input.squeeze(0), next_token_embed]).unsqueeze(0)
+        return current_input, tokens, loss
+
+
+if __name__ == "__main__":
+    device = "cuda"
+
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-1.7B")
+    qwen = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-1.7B").to(device)
+    qwen.eval()
+    explainer = Explainer(qwen)
+
+    with torch.no_grad():
+        startage = explainer.transformer.model.embed_tokens(torch.LongTensor([[151644, 872, 198]]).to(device))
+        endage = explainer.transformer.model.embed_tokens(torch.LongTensor([[151645, 198]]).to(device))
+        startas = explainer.transformer.model.embed_tokens(torch.LongTensor([[151644, 77091, 198]]).to(device))
+
+    dataset = ExperienceDataset("new_dataset", tokenizer, device=device)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+
+    se = StateEncoder().to(device)
+    se.train()
+    se_optim = optim.Adam(se.parameters(), lr=1e-3)
+    se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=1000)
+
+    loss_history = []
+    logger.info("start training")
+    for epoch in range(1000):
+        for states, actions, rewards, explanation in dataloader:
+            start = time.time()
+
+            states = states.squeeze(0)
+            actions = actions.squeeze(0)
+            rewards = rewards.squeeze(0)
+            explanation = explanation.squeeze(0)
+
+            se_optim.zero_grad()
+            state_embeds = se.forward(states, actions, rewards)
+            _, _, loss = explainer.generate_with_loss(
+                state_embeds.unsqueeze(0).to(dtype=torch.bfloat16), 
+                startage, endage, startas,
+                explanation,
+                max_length=35,
+                temperature=0.6
+            )
+
+            if not loss:
+                continue
+            sum_loss = sum(loss[1:])
+            sum_loss.backward()
+            se_optim.step()
+            se_scheduler.step()
+
+            logger.info(f"epoch: {epoch} loss: {sum_loss.item():.4f}, time: {time.time() - start:.2f}s")
+            loss_history.append(sum_loss.item())
+    with open("weights.pth", "wb") as f:
+        torch.save(se.state_dict(), f)
+    with open("loss_history.json", "wt") as f:
+        json.dump(loss_history, f)
+    logger.info("training finished")
