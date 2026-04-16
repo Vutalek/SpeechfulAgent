@@ -200,24 +200,24 @@ class Explainer():
 
 
 if __name__ == "__main__":
-    device = "cuda"
+    device_qwen = "cuda:0"
+    device_se = "cuda:1"
 
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-1.7B")
-    qwen = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-1.7B").to(device)
-    qwen.eval()
+    qwen = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-1.7B").to(device_qwen)
     explainer = Explainer(qwen)
 
     with torch.no_grad():
-        startage = explainer.transformer.model.embed_tokens(torch.LongTensor([[151644, 872, 198]]).to(device))
-        endage = explainer.transformer.model.embed_tokens(torch.LongTensor([[151645, 198]]).to(device))
-        startas = explainer.transformer.model.embed_tokens(torch.LongTensor([[151644, 77091, 198]]).to(device))
+        startage = explainer.transformer.model.embed_tokens(torch.LongTensor([[151644, 872, 198]]).to(device_qwen))
+        endage = explainer.transformer.model.embed_tokens(torch.LongTensor([[151645, 198]]).to(device_qwen))
+        startas = explainer.transformer.model.embed_tokens(torch.LongTensor([[151644, 77091, 198]]).to(device_qwen))
 
-    dataset = ExperienceDataset("new_dataset", tokenizer, device=device)
+    dataset = ExperienceDataset("new_dataset", tokenizer, device=device_se)
     train_set, validation_set = random_split(dataset, [35, 5])
     train_loader = DataLoader(train_set, batch_size=1, shuffle=True)
     validation_loader = DataLoader(validation_set, batch_size=1, shuffle=False)
 
-    se = StateEncoder().to(device)
+    se = StateEncoder().to(device_se)
     se.train()
     se_optim = optim.AdamW(se.parameters(), lr=1e-3, weight_decay=5e-4)
     se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=100)
@@ -238,10 +238,10 @@ if __name__ == "__main__":
             states = states.squeeze(0)
             actions = actions.squeeze(0)
             rewards = rewards.squeeze(0)
-            explanation = explanation.squeeze(0)
+            explanation = explanation.squeeze(0).to(device_qwen)
 
             se_optim.zero_grad()
-            state_embeds = se.forward(states, actions, rewards)
+            state_embeds = se.forward(states, actions, rewards).to(device_qwen)
             _, _, loss = explainer.generate_with_loss(
                 state_embeds.unsqueeze(0).to(dtype=torch.bfloat16), 
                 startage, endage, startas,

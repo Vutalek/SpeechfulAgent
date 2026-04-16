@@ -215,7 +215,7 @@ if __name__ == "__main__":
     with open("weights.pth", "rb") as f:
         se.load_state_dict(torch.load(f))
     se.eval()
-    states, actions, rewards, explanation = dataset[0]
+    states, actions, rewards, explanation = dataset[20]
 
     states = states.squeeze(0)
     actions = actions.squeeze(0)
