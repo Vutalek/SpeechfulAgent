@@ -142,61 +142,38 @@ class Explainer():
     def generate_with_loss(
         self,
         input_embeds: torch.Tensor,
-        startage,
-        endage,
-        startas,
-        ground_truth,
-        max_length: int=32,
-        temperature: float=0.0,
-        top_k: int=0,
-    ):
+        startage: torch.Tensor,
+        endage: torch.Tensor,
+        startas: torch.Tensor,
+        ground_truth
+    ) -> torch.Tensor:
         if self.transformer is None:
             raise RuntimeError("Model not loaded!")
         
-        tokens = []
-        loss = []
+        vector_ground_truth = self.transformer.model.embed_tokens(
+            torch.LongTensor([ground_truth]).to(self.transformer.device)
+        )
         
-        prefix_len = startage.shape[1] + input_embeds.shape[1] + endage.shape[1] + startas.shape[1]
-
-        ignore_index = -100
-        full_labels = torch.full((prefix_len + len(ground_truth),), ignore_index, dtype=torch.long, device=ground_truth.device)
-        full_labels[prefix_len:] = ground_truth
-        
-        current_input = torch.cat([
+        llm_input = torch.cat([
             startage.squeeze(0), 
             input_embeds.squeeze(0),
             endage.squeeze(0),
-            startas.squeeze(0)
-        ]).unsqueeze(0)
-        
-        for _ in range(max_length):
-            current_labels = full_labels[:current_input.shape[1]].unsqueeze(0)
+            startas.squeeze(0),
+            vector_ground_truth.squeeze(0) # Teacher Forcing
+        ], dim=0).unsqueeze(0)
 
-            outputs = self.transformer.forward(
-                inputs_embeds=current_input.to(torch.bfloat16), 
-                labels=current_labels, 
-                use_cache=False
-            )
+        ignore_index = -100
+        labels = torch.full_like(llm_input, ignore_index, dtype=torch.long, device=ground_truth.device)
+        prefix_len = startage.shape[1] + input_embeds.shape[1] + endage.shape[1] + startas.shape[1]
+        labels[0, prefix_len:] = ground_truth
 
-            if outputs.loss is not None:
-                loss.append(outputs.loss)
+        outputs = self.transformer.forward(
+            inputs_embeds=llm_input.to(torch.bfloat16), 
+            labels=labels, 
+            use_cache=False
+        )
 
-            next_token_logits = outputs.logits[0, -1, :]
-
-            if temperature == 0.0:
-                next_token = self._greedy_sampling(next_token_logits)
-            else:
-                next_token_logits = self._apply_temperature(next_token_logits, temperature)
-                next_token_logits = self._apply_top_k(next_token_logits, top_k)
-                next_token = self._random_sampling(next_token_logits)
-            tokens.append(next_token)
-
-            next_token_embed = self.transformer.model.embed_tokens(
-                torch.LongTensor([[next_token]]).to(self.transformer.device)
-            ).squeeze(0)
-
-            current_input = torch.cat([current_input.squeeze(0), next_token_embed]).unsqueeze(0)
-        return current_input, tokens, loss
+        return outputs.loss
 
 
 if __name__ == "__main__":
@@ -205,6 +182,8 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-1.7B")
     qwen = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-1.7B").to(device_qwen)
+    qwen.gradient_checkpointing_enable() 
+    qwen.config.use_cache = False
     explainer = Explainer(qwen)
 
     with torch.no_grad():
@@ -242,24 +221,22 @@ if __name__ == "__main__":
 
             se_optim.zero_grad()
             state_embeds = se.forward(states, actions, rewards).to(device_qwen)
-            _, _, loss = explainer.generate_with_loss(
+            loss = explainer.generate_with_loss(
                 state_embeds.unsqueeze(0).to(dtype=torch.bfloat16), 
                 startage, endage, startas,
-                explanation,
-                max_length=len(explanation),
-                temperature=0.6
+                explanation
             )
 
-            if not loss:
-                continue
-            sum_loss = sum(loss[1:])
-            sum_loss.backward()
+            loss.backward()
             total_norm = clip_grad_norm_(se.parameters(), max_norm=float('inf'), norm_type=2)
             se_optim.step()
 
-            logger.info(f"TRAIN epoch: {epoch} loss: {sum_loss.item():.4f}, grad_norm: {total_norm.item()}, lr: {se_scheduler.get_last_lr()[0]:.6f}, time: {time.time() - start:.2f}s")
-            history.append(sum_loss.item())
+            logger.info(f"TRAIN epoch: {epoch} loss: {loss.item():.4f}, grad_norm: {total_norm.item()}, lr: {se_scheduler.get_last_lr()[0]:.6f}, time: {time.time() - start:.2f}s")
+            history.append(loss.item())
         se_scheduler.step()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
         loss_history.append(history)
 
         # validation
@@ -273,20 +250,14 @@ if __name__ == "__main__":
                 explanation = explanation.squeeze(0)
 
                 state_embeds = se.forward(states, actions, rewards)
-                _, _, loss = explainer.generate_with_loss(
+                loss = explainer.generate_with_loss(
                     state_embeds.unsqueeze(0).to(dtype=torch.bfloat16), 
                     startage, endage, startas,
-                    explanation,
-                    max_length=len(explanation),
-                    temperature=0.0
+                    explanation
                 )
 
-                if not loss:
-                    continue
-                sum_loss = sum(loss[1:])
-
-                logger.info(f"VALIDATION epoch: {epoch} loss: {sum_loss.item():.4f}")
-                history.append(sum_loss.item())
+                logger.info(f"VALIDATION epoch: {epoch} loss: {loss.item():.4f}")
+                history.append(loss.item())
             validation_history.append(history)
 
             #early_stopping
