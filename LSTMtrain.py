@@ -151,7 +151,7 @@ class Explainer():
             raise RuntimeError("Model not loaded!")
         
         vector_ground_truth = self.transformer.model.embed_tokens(
-            torch.LongTensor([ground_truth]).to(self.transformer.device)
+            ground_truth.to(self.transformer.device)
         )
         
         llm_input = torch.cat([
@@ -163,13 +163,13 @@ class Explainer():
         ], dim=0).unsqueeze(0)
 
         ignore_index = -100
-        labels = torch.full_like(llm_input, ignore_index, dtype=torch.long, device=ground_truth.device)
+        labels = torch.full((llm_input.shape[0], llm_input.shape[1]), ignore_index, dtype=torch.long, device=ground_truth.device)
         prefix_len = startage.shape[1] + input_embeds.shape[1] + endage.shape[1] + startas.shape[1]
         labels[0, prefix_len:] = ground_truth
 
         outputs = self.transformer.forward(
             inputs_embeds=llm_input.to(torch.bfloat16), 
-            labels=labels, 
+            labels=labels,
             use_cache=False
         )
 
@@ -177,8 +177,8 @@ class Explainer():
 
 
 if __name__ == "__main__":
-    device_qwen = "cuda:0"
-    device_se = "cuda:1"
+    device_qwen = "cuda"
+    device_se = "cuda"
 
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-1.7B")
     qwen = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-1.7B").to(device_qwen)
@@ -199,15 +199,15 @@ if __name__ == "__main__":
     se = StateEncoder().to(device_se)
     se.train()
     se_optim = optim.AdamW(se.parameters(), lr=1e-3, weight_decay=5e-4)
-    se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=100)
+    se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=1000)
 
     loss_history = []
     validation_history = []
     best_validation_loss = None
     early_stopping_counter = 0
-    early_stopping_patience = 7
+    early_stopping_patience = 1000
     logger.info("start training")
-    for epoch in range(100):
+    for epoch in range(1000):
         # training
         se.train()
         history = []
@@ -249,7 +249,7 @@ if __name__ == "__main__":
                 rewards = rewards.squeeze(0)
                 explanation = explanation.squeeze(0)
 
-                state_embeds = se.forward(states, actions, rewards)
+                state_embeds = se.forward(states, actions, rewards).to(device_qwen)
                 loss = explainer.generate_with_loss(
                     state_embeds.unsqueeze(0).to(dtype=torch.bfloat16), 
                     startage, endage, startas,
