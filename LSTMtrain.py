@@ -191,8 +191,8 @@ if __name__ == "__main__":
         endage = explainer.transformer.model.embed_tokens(torch.LongTensor([[151645, 198]]).to(device_qwen))
         startas = explainer.transformer.model.embed_tokens(torch.LongTensor([[151644, 77091, 198]]).to(device_qwen))
 
-    dataset = ExperienceDataset("new_dataset", tokenizer, device=device_se)
-    train_set, validation_set = random_split(dataset, [35, 5])
+    dataset = ExperienceDataset("final_dataset", tokenizer, device=device_se)
+    train_set, validation_set = random_split(dataset, [450, 50])
     train_loader = DataLoader(train_set, batch_size=1, shuffle=True)
     validation_loader = DataLoader(validation_set, batch_size=1, shuffle=False)
 
@@ -205,7 +205,7 @@ if __name__ == "__main__":
     validation_history = []
     best_validation_loss = None
     early_stopping_counter = 0
-    early_stopping_patience = 1000
+    early_stopping_patience = 11
     logger.info("start training")
     for epoch in range(1000):
         # training
@@ -233,6 +233,7 @@ if __name__ == "__main__":
 
             logger.info(f"TRAIN epoch: {epoch} loss: {loss.item():.4f}, grad_norm: {total_norm.item()}, lr: {se_scheduler.get_last_lr()[0]:.6f}, time: {time.time() - start:.2f}s")
             history.append(loss.item())
+        logger.info(f"TRAIN epoch summary: {epoch} loss: {sum(history) / len(history):.4f}")
         se_scheduler.step()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -256,8 +257,8 @@ if __name__ == "__main__":
                     explanation
                 )
 
-                logger.info(f"VALIDATION epoch: {epoch} loss: {loss.item():.4f}")
                 history.append(loss.item())
+            logger.info(f"VALIDATION epoch: {epoch} loss: {sum(history) / len(history):.4f}")
             validation_history.append(history)
 
             #early_stopping
