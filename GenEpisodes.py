@@ -3,12 +3,13 @@ import json
 from typing import List
 
 import gymnasium as gym
+from tqdm import tqdm
 
 from speechfulagent.dataclasses import *
 from speechfulagent.agent import BaseAgent, A2CAgent
 from speechfulagent.agent.net import DiscreteA2C
 
-SAVE_DIR = "episodes_bad"
+SAVE_DIR = "episodes_good"
 
 
 def play_episode(agent: BaseAgent) -> List[Experience]:
@@ -49,13 +50,13 @@ if __name__ == "__main__":
 
     env = gym.make("FrozenLake-v1")
     agent = A2CAgent(env)
-    # agent.load_model("agent_models")
-    agent.set_model(DiscreteA2C(16, 4))
+    agent.load_model("agent_models")
+    # agent.set_model(DiscreteA2C(16, 4))
     agent.eval()
 
     counter = 0
     name_format = SAVE_DIR + "/data/episode{}.json"
-    for i in range(20):
+    for i in tqdm(range(250)):
         episode = play_episode(agent)
         filename = name_format.format(i)
         episode_to_json(filename, episode)

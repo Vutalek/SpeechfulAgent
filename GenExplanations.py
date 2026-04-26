@@ -3,7 +3,7 @@ import json
 from typing import List, Dict
 
 from openai import OpenAI
-from langchain_core.prompts import PromptTemplate
+from tqdm import tqdm
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -45,11 +45,11 @@ prompt = """Ты RL-исследователь.
 
 def explain_folder(folder: str) -> List[Dict[str, str]]:
     explanations = []
-    for filename in os.listdir(folder):
+    for filename in tqdm(os.listdir(folder)):
         with open(folder+"/"+filename, "rt") as f:
             episode = f.read()
         completion = client.chat.completions.create(
-            model="gpt://b1gccpjnou3q4l9pegs9/deepseek-v32/latest",
+            model="gpt://b1gccpjnou3q4l9pegs9/yandexgpt-5.1/latest",
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": episode}
@@ -65,11 +65,11 @@ def explain_folder(folder: str) -> List[Dict[str, str]]:
     return explanations
 
 if __name__ == "__main__":
-    explanations_good = explain_folder("new_dataset/episodes_good/data")
-    explanations_bad = explain_folder("new_dataset/episodes_bad/data")
-    with open("new_dataset/explanations_good.json", "wt") as f:
+    explanations_good = explain_folder("final_dataset/episodes_good/data")
+    explanations_bad = explain_folder("final_dataset/episodes_bad/data")
+    with open("final_dataset/explanations_good.json", "wt", encoding="utf-8") as f:
         json.dump(explanations_good, f, ensure_ascii=False, indent=4)
-    with open("new_dataset/explanations_bad.json", "wt") as f:
+    with open("final_dataset/explanations_bad.json", "wt", encoding="utf-8") as f:
         json.dump(explanations_bad, f, ensure_ascii=False, indent=4)
 
 
