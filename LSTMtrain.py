@@ -199,15 +199,15 @@ if __name__ == "__main__":
     se = StateEncoder().to(device_se)
     se.train()
     se_optim = optim.AdamW(se.parameters(), lr=1e-3, weight_decay=5e-4)
-    se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=1000)
+    se_scheduler = optim.lr_scheduler.CosineAnnealingLR(se_optim, T_max=100)
 
     loss_history = []
     validation_history = []
     best_validation_loss = None
     early_stopping_counter = 0
-    early_stopping_patience = 11
+    early_stopping_patience = 5
     logger.info("start training")
-    for epoch in range(1000):
+    for epoch in range(100):
         # training
         se.train()
         history = []
