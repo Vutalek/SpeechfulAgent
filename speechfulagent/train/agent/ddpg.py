@@ -1,3 +1,5 @@
+"""Module with DDPG trainer."""
+
 from typing import List, Tuple, Optional
 from copy import deepcopy
 
@@ -9,13 +11,14 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import gymnasium as gym
 
 from .base_trainer import BaseTrainer
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience, EnvInfo, DDPGTrainInfo
 from speechfulagent.agent import DDPGAgent
 from speechfulagent.agent.net import DDPGActor, DDPGCritic
 from .replay_buffer import ReplayBuffer
 
 
 class DDPGTrainer(BaseTrainer):
+    """DDPG trainer"""
     def __init__(
         self,
         env: gym.Env,
@@ -39,7 +42,15 @@ class DDPGTrainer(BaseTrainer):
     ):
         super().__init__(seed)
         self.env = env
-        self.agent = DDPGAgent(self.env, ou_enable, ou_mu, ou_theta, ou_sigma, ou_epsilon, self.seed)
+        self.agent = DDPGAgent(
+            self.env,
+            ou_enable,
+            ou_mu,
+            ou_theta,
+            ou_sigma,
+            ou_epsilon,
+            self.seed
+        )
 
         self.objective = objective
 
@@ -60,7 +71,7 @@ class DDPGTrainer(BaseTrainer):
             act = self.agent.act_shape[0]
         else:
             act = 0
-            
+
         if actor is not None:
             self.actor = actor
         else:
@@ -91,9 +102,9 @@ class DDPGTrainer(BaseTrainer):
         self.agent.set_actor(self.actor)
         self.agent.set_critic(self.critic)
         self.agent.train()
-    
+
     def _batch_to_tensors(
-        self, 
+        self,
         batch: List[Experience]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         states, actions, rewards, next_states, dones = [], [], [], [], []
@@ -115,14 +126,14 @@ class DDPGTrainer(BaseTrainer):
             next_states_t = F.one_hot(torch.as_tensor(next_states), self.agent.obs_n)
         dones_t = torch.as_tensor(dones)
         return states_t, actions_t, rewards_t, next_states_t, dones_t
-    
+
     def _alphasync(self, train, target):
         state = train.state_dict()
         tgt_state = target.state_dict()
         for k, v in state.items():
             tgt_state[k] = self.alpha * tgt_state[k] + (1 - self.alpha) * v
         target.load_state_dict(tgt_state)
-    
+
     def train(self) -> Tuple[DDPGAgent, EnvInfo, DDPGTrainInfo]:
         n_iter = 0
         total_rewards = []
@@ -137,7 +148,9 @@ class DDPGTrainer(BaseTrainer):
                 total_rewards.append(reward)
                 m_reward = np.mean(total_rewards[-100:])
                 if self.logger:
-                    self.logger.info(f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}")
+                    self.logger.info(
+                        f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}"
+                    )
                 if self.writer:
                     self.writer.add_scalar("reward_100", m_reward, n_iter)
                     self.writer.add_scalar("reward", reward, n_iter)
@@ -149,10 +162,10 @@ class DDPGTrainer(BaseTrainer):
 
                 self.agent.reset()
                 self.agent.reset_ou()
-            
+
             if len(self.replay_buffer) < self.replay_buffer_start_size:
                 continue
-            
+
             batch = self.replay_buffer.sample(self.batch_size)
             states, actions, rewards, next_states, dones = self._batch_to_tensors(batch)
 

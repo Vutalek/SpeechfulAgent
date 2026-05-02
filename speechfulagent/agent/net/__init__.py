@@ -1,3 +1,5 @@
+"""Module with basic neural networks for RL methods: DQN, A2C, DDPG and PPO."""
+
 from .dqn import MLPDQN
 from .a2c import DiscreteA2C, ContinuousA2C
 from .ddpg import DDPGActor, DDPGCritic

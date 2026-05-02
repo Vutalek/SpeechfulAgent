@@ -1,3 +1,5 @@
+"""Module with implementation of basic PPO agent for both continuous and discrete environments."""
+
 from typing import Dict, Any, Optional
 
 import numpy as np
@@ -5,8 +7,7 @@ import torch
 import torch.nn.functional as F
 import gymnasium as gym
 
-from speechfulagent.types import *
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience, EnvInfo, PPOTrainInfo
 from .base_agent import BaseAgent
 
 
@@ -16,7 +17,7 @@ class PPOAgent(BaseAgent):
         super().__init__(env, seed)
         self.actor: Optional[torch.nn.Module] = None
         self.critic: Optional[torch.nn.Module] = None
-    
+
     def _step(self) -> Experience:
         # checking if model is loaded
         if self.actor is None:
@@ -42,7 +43,7 @@ class PPOAgent(BaseAgent):
             policy = self.actor(state)
             probs = torch.softmax(policy, dim=-1)
             action = int(torch.multinomial(probs, 1).item())
-        
+
         next_state, reward, is_done, is_trunc, _ = self.env.step(action)
         self.total_reward += float(reward)
 
@@ -58,7 +59,7 @@ class PPOAgent(BaseAgent):
             done
         )
         return exp
-    
+
     def _save_model(self, path: str, version: str, *args, **kwargs) -> Dict[str, Any]:
         # checking if model is not None
         if self.actor is None or self.critic is None:

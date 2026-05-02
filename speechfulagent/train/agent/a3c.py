@@ -1,3 +1,5 @@
+"""Module with A3C trainer."""
+
 from collections import deque
 from typing import Tuple, Optional
 from copy import deepcopy
@@ -11,12 +13,13 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import gymnasium as gym
 
 from .base_trainer import BaseTrainer
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience, EnvInfo, A3CTrainInfo
 from speechfulagent.agent import A2CAgent
 from speechfulagent.agent.net import DiscreteA2C, ContinuousA2C
 
 
 class A3CTrainer(BaseTrainer):
+    """A3C trainer for trainging A2C."""
     def __init__(
         self,
         env: gym.Env,
@@ -69,7 +72,7 @@ class A3CTrainer(BaseTrainer):
             else:
                 act = self.agent.act_n
                 self.train_net = DiscreteA2C(obs, act)
-        
+
         self.optim = optim.Adam(params=self.train_net.parameters(), lr=learning_rate)
         self.worker_batch_size = worker_batch_size
         self.train_batch_size = train_batch_size
@@ -80,7 +83,7 @@ class A3CTrainer(BaseTrainer):
 
         self.agent.set_model(self.train_net)
         self.agent.train()
-    
+
     def train(self) -> Tuple[A2CAgent, EnvInfo, A3CTrainInfo]:
         mp.freeze_support()
         mp.set_start_method("spawn")
@@ -89,7 +92,7 @@ class A3CTrainer(BaseTrainer):
         self.pool = []
         for pid in range(self.n_envs):
             process = mp.Process(
-                target=worker_function, 
+                target=worker_function,
                 args=(
                     pid,
                     self.env,
@@ -154,9 +157,9 @@ class A3CTrainer(BaseTrainer):
         )
         self.agent.eval()
         return self.agent, env_info, train_info
-    
+
 def worker_function(
-    pid: int, 
+    pid: int,
     env: gym.Env,
     objective: float,
     net: torch.nn.Module,
@@ -169,6 +172,7 @@ def worker_function(
     has_writer: bool=False,
     logger=None
 ):
+    """Worker of a training thread."""
     if has_writer:
         writer = SummaryWriter(comment=f"_p{pid}")
     else:
@@ -197,8 +201,8 @@ def worker_function(
                     f"{pid}: done {len(total_rewards)} games, reward {m_reward:.3f}"
                 )
             if writer:
-                writer.add_scalar(f"reward_100", m_reward, n_iter)
-                writer.add_scalar(f"reward", reward, n_iter)
+                writer.add_scalar("reward_100", m_reward, n_iter)
+                writer.add_scalar("reward", reward, n_iter)
 
             if m_reward > objective:
                 if logger:
@@ -227,7 +231,7 @@ def worker_function(
         # accumulating batch
         if len(batch) < batch_size:
             continue
-        
+
         # batch to tensors
         estates, eactions, erewards, enot_done_idx, elast_states = [], [], [], [], []
         for idx, e in enumerate(batch):
@@ -237,7 +241,7 @@ def worker_function(
             if e.next_state is not None:
                 enot_done_idx.append(idx)
                 elast_states.append(e.next_state)
-        
+
         if local_agent.is_obs_cont:
             states = torch.as_tensor(np.array(estates))
         else:
@@ -262,7 +266,7 @@ def worker_function(
             rewards[enot_done_idx] += last_vals_np
         ref_vals = torch.as_tensor(rewards)
         batch.clear()
-        
+
         # loss and grad calculation
         net.zero_grad()
         if local_agent.is_act_cont:

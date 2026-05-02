@@ -1,3 +1,5 @@
+"""Module with implementation of basic A2C agent for both continuous and discrete environments."""
+
 from typing import Dict, Any, Optional
 
 import numpy as np
@@ -5,8 +7,7 @@ import torch
 import torch.nn.functional as F
 import gymnasium as gym
 
-from speechfulagent.types import *
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience, EnvInfo, A3CTrainInfo
 from .base_agent import BaseAgent
 
 
@@ -15,7 +16,7 @@ class A2CAgent(BaseAgent):
     def __init__(self, env: gym.Env, seed: int=70):
         super().__init__(env, seed)
         self.net: Optional[torch.nn.Module] = None
-    
+
     def _step(self) -> Experience:
         # checking if model is loaded
         if self.net is None:
@@ -40,7 +41,7 @@ class A2CAgent(BaseAgent):
             policy, _ = self.net(state)
             probs = torch.softmax(policy, dim=-1)
             action = int(torch.multinomial(probs, 1).item())
-        
+
         next_state, reward, is_done, is_trunc, _ = self.env.step(action)
         self.total_reward += float(reward)
 
@@ -56,7 +57,7 @@ class A2CAgent(BaseAgent):
             done
         )
         return exp
-    
+
     def _save_model(self, path: str, version: str, *args, **kwargs) -> Dict[str, Any]:
         # checking if model is not None
         if self.net is None:

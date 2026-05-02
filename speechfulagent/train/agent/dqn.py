@@ -1,3 +1,5 @@
+"""Module with DQN trainer."""
+
 from typing import List, Tuple, Optional
 from copy import deepcopy
 
@@ -9,13 +11,14 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import gymnasium as gym
 
 from .base_trainer import BaseTrainer
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience, EnvInfo, DQNTrainInfo
 from speechfulagent.agent import DQNAgent
 from speechfulagent.agent.net import MLPDQN
 from .replay_buffer import ReplayBuffer
 
 
 class DQNTrainer(BaseTrainer):
+    """DQN trainer."""
     def __init__(
         self,
         env: gym.Env,
@@ -62,7 +65,7 @@ class DQNTrainer(BaseTrainer):
         self.batch_size = batch_size
         self.optim = optim.Adam(params=self.train_net.parameters(), lr=learning_rate)
         self.learning_rate = learning_rate
-        
+
         self.epsilon_decay_last_frame = epsilon_decay_last_frame
         self.epsilon_decay_start = epsilon_decay_start
         self.epsilon_decay_final = epsilon_decay_final
@@ -72,9 +75,9 @@ class DQNTrainer(BaseTrainer):
 
         self.agent.set_model(self.train_net)
         self.agent.train()
-    
+
     def _batch_to_tensors(
-        self, 
+        self,
         batch: List[Experience]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         states, actions, rewards, next_states, dones = [], [], [], [], []
@@ -96,7 +99,7 @@ class DQNTrainer(BaseTrainer):
             next_states_t = F.one_hot(torch.as_tensor(next_states), self.agent.obs_n)
         dones_t = torch.as_tensor(dones)
         return states_t, actions_t, rewards_t, next_states_t, dones_t
-    
+
     def _loss(self, batch: List[Experience]) -> torch.Tensor:
         states_t, actions_t, rewards_t, next_states_t, dones_t = self._batch_to_tensors(batch)
         q_values = self.train_net(states_t).gather(
@@ -109,7 +112,7 @@ class DQNTrainer(BaseTrainer):
 
         expected_q_values = next_state_values * self.gamma + rewards_t
         return F.mse_loss(q_values, expected_q_values)
-    
+
     def train(self) -> Tuple[DQNAgent, EnvInfo, DQNTrainInfo]:
         n_iter = 0
         total_rewards = []
@@ -145,12 +148,12 @@ class DQNTrainer(BaseTrainer):
                     break
 
                 self.agent.reset()
-            
+
             if len(self.replay_buffer) < self.replay_buffer_start_size:
                 continue
             if n_iter % self.sync_target_frames == 0:
                 self.target_net.load_state_dict(self.train_net.state_dict())
-            
+
             self.optim.zero_grad()
             batch = self.replay_buffer.sample(self.batch_size)
             loss = self._loss(batch)

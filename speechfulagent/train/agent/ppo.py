@@ -1,3 +1,5 @@
+"""Module with PPO trainer."""
+
 from typing import List, Tuple, Optional
 
 import numpy as np
@@ -8,12 +10,13 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import gymnasium as gym
 
 from .base_trainer import BaseTrainer
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience, EnvInfo, PPOTrainInfo
 from speechfulagent.agent import PPOAgent
 from speechfulagent.agent.net import DiscretePPOActor, ContinuousPPOActor, PPOCritic
 
 
 class PPOTrainer(BaseTrainer):
+    """PPO trainer"""
     def __init__(
         self,
         env: gym.Env,
@@ -68,7 +71,7 @@ class PPOTrainer(BaseTrainer):
                 self.actor = ContinuousPPOActor(obs, act)
             else:
                 self.actor = DiscretePPOActor(obs, act)
-        
+
         if critic is not None:
             self.critic = critic
         else:
@@ -88,8 +91,8 @@ class PPOTrainer(BaseTrainer):
         self.agent.train()
 
     def _reference_advantage(
-        self, 
-        trajectory: List[Experience], 
+        self,
+        trajectory: List[Experience],
         states: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         vals = self.critic(states)
@@ -112,9 +115,9 @@ class PPOTrainer(BaseTrainer):
         advs = torch.FloatTensor(np.asarray(list(reversed(result_adv))))
         refs = torch.FloatTensor(np.asarray(list(reversed(result_ref))))
         return advs, refs
-    
+
     def _batch_to_tensors(
-        self, 
+        self,
         batch: List[Experience]
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         states, actions = [], []
@@ -133,7 +136,7 @@ class PPOTrainer(BaseTrainer):
             actions_t = torch.LongTensor(actions)
 
         return states_t, actions_t
-    
+
     def train(self) -> Tuple[PPOAgent, EnvInfo, PPOTrainInfo]:
         n_iter = 0
         total_rewards = []
@@ -161,10 +164,10 @@ class PPOTrainer(BaseTrainer):
                     break
 
                 self.agent.reset()
-            
+
             if len(self.trajectory) < self.trajectory_size:
                 continue
-            
+
             states, actions = self._batch_to_tensors(self.trajectory)
             advantages, references = self._reference_advantage(self.trajectory, states)
             if self.agent.is_act_cont:
@@ -205,7 +208,8 @@ class PPOTrainer(BaseTrainer):
                     self.actor_optim.zero_grad()
                     if self.agent.is_act_cont:
                         batch_mu = self.actor(batch_states)
-                        p1 = - ((batch_mu - batch_actions) ** 2) / (2*torch.exp(self.actor.logstd).clamp(min=1e-3))
+                        p1 = - ((batch_mu - batch_actions) ** 2) / \
+                        (2*torch.exp(self.actor.logstd).clamp(min=1e-3))
                         p2 = - torch.log(torch.sqrt(2 * torch.pi * torch.exp(self.actor.logstd)))
                         batch_logprob = p1 + p2
                     else:

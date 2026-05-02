@@ -1,17 +1,19 @@
+"""Module with base abstract class for agent."""
+
 from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
 import gymnasium as gym
 
-from speechfulagent.types import *
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience
 from speechfulagent.versioning import VersioningMixin
 
 
 class BaseAgent(VersioningMixin, ABC):
+    """Abstract agent."""
     def __init__(
-        self, 
+        self,
         env: gym.Env,
         seed: int=70
     ):
@@ -26,14 +28,14 @@ class BaseAgent(VersioningMixin, ABC):
         else:
             self.is_obs_cont = True
             self.obs_shape = env.observation_space.shape
-        
+
         if isinstance(env.action_space, gym.spaces.Discrete):
             self.is_act_cont = False
             self.act_n = int(env.action_space.n)
         else:
             self.is_act_cont = True
             self.act_shape = env.action_space.shape
-            
+
         self.env_state = None
         self.total_reward = 0.0
 
@@ -64,7 +66,7 @@ class BaseAgent(VersioningMixin, ABC):
         method _step() must be implemented.
         """
         return self._step()
-    
+
     @abstractmethod
     def _step(self) -> Experience:
         pass

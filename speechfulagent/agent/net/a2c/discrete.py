@@ -1,3 +1,5 @@
+"""Module with basic A2C network for discrete environments."""
+
 from typing import Tuple
 
 import torch
@@ -5,6 +7,7 @@ import torch.nn as nn
 
 
 class DiscreteA2C(nn.Module):
+    """Basic agent neural network for A2C."""
     def __init__(self, n_input: int, n_actions: int, hidden: int=128):
         super().__init__()
         self.backbone = nn.Sequential(
@@ -25,5 +28,6 @@ class DiscreteA2C(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Neural network forward pass."""
         backbone = self.backbone(x.type(torch.float32))
         return self.actor(backbone), self.critic(backbone)

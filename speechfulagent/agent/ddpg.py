@@ -1,3 +1,5 @@
+"""Module with implementation of basic DDPG agent for continuous environments."""
+
 from typing import Dict, Any, Optional
 
 import numpy as np
@@ -5,15 +7,14 @@ import torch
 import torch.nn.functional as F
 import gymnasium as gym
 
-from speechfulagent.types import *
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience, EnvInfo, DDPGTrainInfo
 from .base_agent import BaseAgent
 
 
 class DDPGAgent(BaseAgent):
     """DDPG agent"""
     def __init__(
-        self, 
+        self,
         env: gym.Env,
         ou_enable: bool=True,
         ou_mu: float=0.0,
@@ -37,8 +38,9 @@ class DDPGAgent(BaseAgent):
         self.action_state = None
 
     def reset_ou(self):
+        """Resets OU-process state."""
         self.action_state = None
-    
+
     def _step(self) -> Experience:
         if self.actor is None:
             raise RuntimeError("Model not loaded!")
@@ -63,7 +65,7 @@ class DDPGAgent(BaseAgent):
 
             action += self.ou_epsilon * self.action_state
         action = np.clip(action, -1.0, 1.0)
-        
+
         next_state, reward, is_done, is_trunc, _ = self.env.step(action)
         self.total_reward += float(reward)
 
@@ -79,7 +81,7 @@ class DDPGAgent(BaseAgent):
             done
         )
         return exp
-    
+
     def _save_model(self, path: str, version: str, *args, **kwargs) -> Dict[str, Any]:
         # checking if model is not None
         if self.actor is None or self.critic is None:

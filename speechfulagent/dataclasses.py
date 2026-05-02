@@ -1,31 +1,60 @@
+"""Dataclasses for project."""
+
 from dataclasses import dataclass, asdict
 from typing import Tuple, Any
 
-from numpy.typing import NDArray
-
-from speechfulagent.types import *
+from speechfulagent.types import State, Action
 
 
 @dataclass
 class Experience:
+    """Experience from environment."""
     state: State
-    action: Action | NDArray
+    action: Action
     reward: float
-    next_state: State
+    next_state: State | None
     done: bool
 
     dict = asdict
 
 @dataclass
 class EnvInfo:
+    """Basic information about environment."""
     name: str
-    n_observations: int | Tuple[Any]
-    n_actions: int | Tuple[Any]
-    
+    n_observations: int | Tuple[Any, ...]
+    n_actions: int | Tuple[Any, ...]
+
+    dict = asdict
+
+@dataclass
+class DQNTrainInfo:
+    """Hyperparameters and some results from DQN training."""
+    # iterations count
+    n_iter: int
+    # objective bound
+    mean_objective: float
+    # gamma
+    gamma: float
+    # replay buffer
+    replay_buffer_size: int
+    replay_buffer_start_size: int
+    # optimization
+    batch_size: int
+    learning_rate: float
+    # target network
+    sync_target_frames: int
+    # epsilon decay
+    epsilon_decay_last_frame: int
+    epsilon_decay_start: float
+    epsilon_decay_final: float
+
+    seed: int
+
     dict = asdict
 
 @dataclass
 class A3CTrainInfo:
+    """Hyperparameters and some results from A3C training."""
     # iterations count
     n_iter: int
     # objective bound
@@ -43,33 +72,12 @@ class A3CTrainInfo:
     n_envs: int
 
     seed: int
-    
-    dict = asdict
-
-@dataclass
-class PPOTrainInfo:
-    # iterations count
-    n_iter: int
-    # objective bound
-    mean_objective: float
-    # gamma
-    gamma: float
-    # ppo + gae
-    gae_lambda: float
-    trajectory_size: int
-    epochs: int
-    eps: float
-    # optimization
-    batch_size: int
-    learning_rate_actor: float
-    learning_rate_critic: float
-
-    seed: int
 
     dict = asdict
 
 @dataclass
 class DDPGTrainInfo:
+    """Hyperparameters and some results from DDPG training."""
     # iterations count
     n_iter: int
     # objective bound
@@ -96,25 +104,23 @@ class DDPGTrainInfo:
     dict = asdict
 
 @dataclass
-class DQNTrainInfo:
+class PPOTrainInfo:
+    """Hyperparameters and some results from PPO training."""
     # iterations count
     n_iter: int
     # objective bound
     mean_objective: float
     # gamma
     gamma: float
-    # replay buffer
-    replay_buffer_size: int
-    replay_buffer_start_size: int
+    # ppo + gae
+    gae_lambda: float
+    trajectory_size: int
+    epochs: int
+    eps: float
     # optimization
     batch_size: int
-    learning_rate: float
-    # target network
-    sync_target_frames: int
-    # epsilon decay
-    epsilon_decay_last_frame: int
-    epsilon_decay_start: float
-    epsilon_decay_final: float
+    learning_rate_actor: float
+    learning_rate_critic: float
 
     seed: int
 
@@ -124,6 +130,7 @@ BaseTrainInfo = DQNTrainInfo | A3CTrainInfo | DDPGTrainInfo | PPOTrainInfo
 
 @dataclass
 class ExplainerTrainInfo:
+    """Hyperparameters and some results from explainer training."""
     #dataset
     pathfile: str
     max_length: int

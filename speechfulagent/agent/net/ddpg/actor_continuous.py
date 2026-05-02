@@ -1,8 +1,11 @@
+"""Module with basic DDPG continuous actor network."""
+
 import torch
 import torch.nn as nn
 
 
 class DDPGActor(nn.Module):
+    """Basic agent actor neural network for DDPG."""
     def __init__(self, n_input: int, n_actions: int):
         super().__init__()
         self.net = nn.Sequential(
@@ -14,5 +17,6 @@ class DDPGActor(nn.Module):
             nn.Tanh()
         )
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Neural network forward pass."""
         return self.net(x.type(torch.float32))

@@ -1,3 +1,5 @@
+"""Module with implementation of basic DQN agent for discrete environments."""
+
 from typing import Dict, Any, Optional
 
 import numpy as np
@@ -5,8 +7,7 @@ import torch
 import torch.nn.functional as F
 import gymnasium as gym
 
-from speechfulagent.types import *
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience, EnvInfo, DQNTrainInfo
 from .base_agent import BaseAgent
 
 
@@ -16,10 +17,10 @@ class DQNAgent(BaseAgent):
         super().__init__(env, seed)
         # check validity of env
         if self.is_act_cont:
-            raise RuntimeError("DQN is not suitable for environments with continuous actions space.")
+            raise RuntimeError("DQN is not suitable for environments with continuous action space.")
         self.net: Optional[torch.nn.Module] = None
         self.epsilon = 0.0
-    
+
     def _step(self) -> Experience:
         # checking if model is loaded
         if self.net is None:
@@ -27,7 +28,7 @@ class DQNAgent(BaseAgent):
         # checking if state is not None
         if self.env_state is None:
             raise RuntimeError("Uninitialized environment!")
-        
+
         # exploration
         if self.training and np.random.random() < self.epsilon:
             action = self.env.action_space.sample()
@@ -40,7 +41,7 @@ class DQNAgent(BaseAgent):
             q_values = self.net(state)
             _, act_idx = torch.max(q_values, dim=1)
             action = int(act_idx.item())
-        
+
         next_state, reward, is_done, is_trunc, _ = self.env.step(action)
         self.total_reward += float(reward)
 
@@ -56,7 +57,7 @@ class DQNAgent(BaseAgent):
             done
         )
         return exp
-    
+
     def _save_model(self, path: str, version: str, *args, **kwargs) -> Dict[str, Any]:
         # checking if model is not None
         if self.net is None:
