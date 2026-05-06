@@ -18,7 +18,9 @@ class BaseExplainer(VersioningMixin, ABC):
         context: List[Experience] | torch.Tensor | Any,
         max_tokens: int=32,
         temperature: float=0.0,
-        top_k: int=0
+        top_k: int=0,
+        *args,
+        **kwargs
     ) -> str:
         """prompt is a tensor of a sequence, that is need to be explained
 
