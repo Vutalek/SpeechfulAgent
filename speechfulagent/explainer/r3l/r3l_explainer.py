@@ -233,5 +233,6 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
             projected_size=data["training"]["se_projected_size"]
         )
         self.encoder.load_state_dict(torch.load(path + '/' + "encoder.pth"))
-        self.tokenizer = AutoTokenizer.from_pretrained(data["training"]["tokenizer_name"])
-        self.transformer = AutoModelForCausalLM.from_pretrained(data["training"]["model_name"]).to(data["training"]["llm_device"])
+        self.encoder.to(data["training"]["encoder_device"])
+        self.tokenizer = AutoTokenizer.from_pretrained(data["training"]["llm_tokenizer_name"])
+        self.transformer = AutoModelForCausalLM.from_pretrained(data["training"]["llm_model_name"]).to(data["training"]["llm_device"])

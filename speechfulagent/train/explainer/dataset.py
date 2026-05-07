@@ -1,57 +1,65 @@
 import json
-import random
-from typing import Any, Optional
+from typing import List, Dict, Any
 
 import torch
 from torch.utils.data import Dataset
 
 from speechfulagent.dataclasses import Experience
-from speechfulagent.explainer.tokenizer import Tokenizer, embed_sequence
 
 
-class SequenceExplanationsDataset(Dataset):
-    def __init__(
-        self, 
-        pathfile: str, 
-        max_length: int, 
-        tokenizer: Optional[Tokenizer] = None, 
-        seed: int = 7070
-    ):
-        random.seed(seed)
-        with open(pathfile, "rt") as f:
-            self.raw_data = json.load(f)
-        for sample in self.raw_data:
-            experiences = [Experience(**exp) for exp in sample["sequence"]]
-            sample["sequence"] = experiences
+class ExperienceDataset(Dataset):
+    def __init__(self, folder: str, tokenizer, device: str="cpu"):
+        self.episodes = []
+        self.episodes.extend(self._proccess_folder(folder + "/explanations_bad.json"))
+        self.episodes.extend(self._proccess_folder(folder + "/explanations_good.json"))
+        self.tokenizer = tokenizer
+        self.device = device
 
-        if not tokenizer:
-            self.tokenizer = Tokenizer()
-            corpus = []
-            for sample in self.raw_data:
-                corpus.extend(sample["explanation"])
-            self.tokenizer.build_vocab(corpus)
-        else:
-            self.tokenizer = tokenizer
-        self.max_length = max_length
-
-        self.sequences = []
-        self.tails = []
-        self.explanations = []
-        for sample in self.raw_data:
-            seq, tail = embed_sequence(sample["sequence"], sample["tail"]+1)
-            self.sequences.append(seq)
-            self.tails.append(tail)
-            self.explanations.append(
-                [self.tokenizer.encode(explain, max_length) for explain in sample["explanation"]]
+    def _json_to_episode(self, file: str) -> List[Experience]:
+        with open(file, "rt") as f:
+            episode = json.load(f)
+        experiences = []
+        for step in episode:
+            experiences.append(
+                Experience(
+                    state=step["state"],
+                    action=step["action"],
+                    reward=step["reward"],
+                    next_state=None,
+                    done=False
+                )
             )
-        
+        experiences[-2].done = True
+        for i in range(len(experiences)-1):
+            experiences[i].next_state = experiences[i+1].state
+        return experiences[:-1]
+    
+    def _proccess_folder(self, path: str) -> List[Dict[str, Any]]:
+        episodes = []
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        for expl in data:
+            ep_folder = expl["folder"]
+            ep_file = expl["filename"]
+            episode = self._json_to_episode(ep_folder + "/" + ep_file)
+            episodes.append(
+                {
+                    "episode": episode,
+                    "explanation": expl["explanation"]
+                }
+            )
+        return episodes
+
     def __len__(self):
-        return len(self.raw_data)
-    
-    def __getitem__(self, index) -> Any:
-        if self.explanations[index]:
-            explanation = random.choice(range(len(self.explanations[index])))
-            return self.sequences[index], self.tails[index], torch.LongTensor(self.explanations[index][explanation])
-        else:
-            return self.sequences[index], self.tails[index], None
-    
+        return len(self.episodes)
+
+    def __getitem__(self, idx):
+        entry = self.episodes[idx]
+        episode = entry["episode"]
+        text = entry["explanation"]
+        states = torch.as_tensor([exp.state for exp in episode], dtype=torch.long).to(self.device)
+        actions = torch.as_tensor([exp.action for exp in episode], dtype=torch.long).to(self.device)
+        rewards = torch.as_tensor([exp.reward for exp in episode], dtype=torch.float32).to(self.device)
+        tok_exp = self.tokenizer.encode(text)
+        explanation = torch.as_tensor(tok_exp, dtype=torch.long).to(self.device),
+        return states, actions, rewards, explanation[0]

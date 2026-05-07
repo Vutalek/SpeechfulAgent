@@ -126,8 +126,6 @@ class PPOTrainInfo:
 
     dict = asdict
 
-BaseTrainInfo = DQNTrainInfo | A3CTrainInfo | DDPGTrainInfo | PPOTrainInfo
-
 @dataclass
 class ExplainerTrainInfo:
     """Hyperparameters and some results from explainer training."""
@@ -162,3 +160,5 @@ class R3LTrainInfo:
     learning_rate: float
 
     dics = asdict
+
+BaseTrainInfo = DQNTrainInfo | A3CTrainInfo | DDPGTrainInfo | PPOTrainInfo | R3LTrainInfo
