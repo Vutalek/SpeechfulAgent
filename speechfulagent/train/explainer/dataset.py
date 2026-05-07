@@ -57,9 +57,6 @@ class ExperienceDataset(Dataset):
         entry = self.episodes[idx]
         episode = entry["episode"]
         text = entry["explanation"]
-        states = torch.as_tensor([exp.state for exp in episode], dtype=torch.long).to(self.device)
-        actions = torch.as_tensor([exp.action for exp in episode], dtype=torch.long).to(self.device)
-        rewards = torch.as_tensor([exp.reward for exp in episode], dtype=torch.float32).to(self.device)
         tok_exp = self.tokenizer.encode(text)
         explanation = torch.as_tensor(tok_exp, dtype=torch.long).to(self.device),
-        return states, actions, rewards, explanation[0]
+        return episode, explanation[0]

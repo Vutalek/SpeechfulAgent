@@ -1,26 +1,33 @@
-from typing import List
+import time
+from typing import List, Tuple, Dict, Any
 
 import torch
+import torch.optim as optim
+from torch.nn.utils import clip_grad_norm_
+from torch.utils.data import random_split, DataLoader
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from .base_trainer import BaseExplainerTrainer
+from speechfulagent.dataclasses import R3LTrainInfo
+from speechfulagent.train.explainer import BaseExplainerTrainer, ExperienceDataset
+from speechfulagent.explainer.r3l import R3LExplainer, R3LStateEncoder
 
 
 class R3LExplainerTrainer(BaseExplainerTrainer):
     def __init__(
         self,
         pathfile: str,
-        validation_size: float,
-        modules: List[int],
-        module_size: int,
-        hidden_size: int,
-        projected_size: int,
-        learning_rate: float,
-        weight_decay: float,
-        llm_model_name: str,
-        llm_tokenizer_name: str,
-        llm_think_start: List[int],
-        llm_think_end: List[int],
-        llm_text_start: List[int],
+        validation_fraction: float=0.1,
+        modules: List[int]=[16, 4, 1],
+        module_size: int=32,
+        hidden_size: int=512,
+        projected_size: int=2048,
+        learning_rate: float=1e-3,
+        weight_decay: float=5e-4,
+        llm_model_name: str="Qwen/Qwen3-1.7B",
+        llm_tokenizer_name: str="Qwen/Qwen3-1.7B",
+        llm_think_start: List[int]=[151644, 872, 198],
+        llm_think_end: List[int]=[151645, 198],
+        llm_text_start: List[int]=[151644, 77091, 198],
         encoder_device: str="cpu",
         llm_device: str="cpu",
         max_iter: int=100,
@@ -29,218 +36,169 @@ class R3LExplainerTrainer(BaseExplainerTrainer):
         seed: int=70
     ):
         super().__init__(seed)
-        self.env = env
-        self.agent = PPOAgent(self.env, self.seed)
-
-        self.objective = objective
-
-        self.gamma = gamma
-        self.gae_lambda = gae_lambda
-
-        self.trajectory = []
-        self.trajectory_size = trajectory_size
-        self.epochs = epochs
-        self.eps = eps
-
-        if self.agent.is_obs_cont:
-            if self.agent.obs_shape is not None:
-                obs = self.agent.obs_shape[0]
-            else:
-                obs = 0
-        else:
-            obs = self.agent.obs_n
-        if self.agent.is_act_cont:
-            if self.agent.act_shape is not None:
-                act = self.agent.act_shape[0]
-            else:
-                act = 0
-        else:
-            act = self.agent.act_n
-
-        if actor is not None:
-            self.actor = actor
-        else:
-            if self.agent.is_act_cont:
-                self.actor = ContinuousPPOActor(obs, act)
-            else:
-                self.actor = DiscretePPOActor(obs, act)
-
-        if critic is not None:
-            self.critic = critic
-        else:
-            self.critic = PPOCritic(obs)
-
-        self.actor_optim = optim.Adam(params=self.actor.parameters(), lr=learning_rate_actor)
-        self.critic_optim = optim.Adam(params=self.critic.parameters(), lr=learning_rate_critic)
-        self.learning_rate_actor = learning_rate_actor
-        self.learning_rate_critic = learning_rate_critic
-        self.batch_size = batch_size
-
-        self.writer = writer
+        self.pathfile = pathfile
+        self.validation_fraction = validation_fraction
+        self.modules = modules
+        self.module_size = module_size
+        self.hidden_size = hidden_size
+        self.projected_size = projected_size
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.llm_model_name = llm_model_name
+        self.llm_tokenizer_name = llm_tokenizer_name
+        self.llm_think_start = llm_think_start
+        self.llm_think_end = llm_think_end
+        self.llm_text_start = llm_text_start
+        self.encoder_device = encoder_device
+        self.llm_device = llm_device
+        self.max_iter = max_iter
+        self.early_stopping = early_stopping
         self.logger = logger
+        self.seed = seed
 
-        self.agent.set_actor(self.actor)
-        self.agent.set_critic(self.critic)
-        self.agent.train()
+        self.tokenizer = AutoTokenizer.from_pretrained(self.llm_tokenizer_name)
+        self.llm = AutoModelForCausalLM.from_pretrained(self.llm_model_name).to(self.llm_device)
+        self.llm.gradient_checkpointing_enable() 
+        self.llm.config.use_cache = False
+        
+        self.dataset = ExperienceDataset(self.pathfile, self.tokenizer, device=self.encoder_device)
+        train_size = int(len(self.dataset) * (1 - self.validation_fraction))
+        val_size = len(self.dataset) - train_size
+        self.train_set, self.validation_set = random_split(self.dataset, [train_size, val_size])
 
-    def _reference_advantage(
-        self,
-        trajectory: List[Experience],
-        states: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        vals = self.critic(states)
-        vals = vals.squeeze().data.numpy()
-        # generalized advantage estimation
-        last_gae = 0.0
-        result_adv = []
-        result_ref = []
-        for val, next_val, exp in zip(
-            reversed(vals[:-1]), reversed(vals[1:]), reversed(trajectory[:-1])
-        ):
-            if exp.done:
-                delta = exp.reward - val
-                last_gae = delta
-            else:
-                delta = exp.reward + self.gamma * next_val - val
-                last_gae = delta + self.gamma * self.gae_lambda * last_gae
-            result_adv.append(last_gae)
-            result_ref.append(last_gae + val)
-        advs = torch.FloatTensor(np.asarray(list(reversed(result_adv))))
-        refs = torch.FloatTensor(np.asarray(list(reversed(result_ref))))
-        return advs, refs
+        self.encoder = R3LStateEncoder(
+            self.modules,
+            self.module_size,
+            self.hidden_size,
+            self.projected_size
+        ).to(self.encoder_device)
+        self.encoder.train()
 
-    def _batch_to_tensors(
-        self,
-        batch: List[Experience]
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        states, actions = [], []
-        for e in batch:
-            states.append(e.state)
-            actions.append(e.action)
-        if self.agent.is_obs_cont:
-            states_t = torch.as_tensor(np.array(states))
-        else:
-            states_t = F.one_hot(torch.as_tensor(states), self.agent.obs_n)
+        self.explainer = R3LExplainer()
+        self.explainer.encoder = self.encoder
+        self.explainer.tokenizer = self.tokenizer
+        self.explainer.transformer = self.llm
 
-        if self.agent.is_act_cont:
-            actions_t = torch.as_tensor(np.array(actions))
-        else:
-            actions_t = [int(e) for e in actions]
-            actions_t = torch.LongTensor(actions)
+    def train(self) -> Tuple[R3LExplainer, R3LTrainInfo, Dict[str, Any]]:
+        train_loader = DataLoader(self.train_set, batch_size=1, shuffle=True)
+        validation_loader = DataLoader(self.validation_set, batch_size=1, shuffle=False)
 
-        return states_t, actions_t
+        encoder_optim = optim.AdamW(
+            self.encoder.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay
+        )
+        encoder_scheduler = optim.lr_scheduler.CosineAnnealingLR(encoder_optim, T_max=self.max_iter)
 
-    def train(self) -> Tuple[PPOAgent, EnvInfo, PPOTrainInfo]:
+        loss_history = []
+        validation_history = []
+
+        best_validation_loss = None
+        early_stopping_counter = 0
+        
+        if self.logger is not None:
+            self.logger.info("Start training")
+
         n_iter = 0
-        total_rewards = []
-        self.agent.reset()
-        while True:
+        for epoch in range(self.max_iter):
             n_iter += 1
-            exp = self.agent.step()
+            # training
+            self.encoder.train()
+            history = []
+            for episode, explanation in train_loader:
+                start = time.time()
 
-            self.trajectory.append(exp)
-            if exp.done:
-                reward = self.agent.total_reward
-                total_rewards.append(reward)
-                m_reward = np.mean(total_rewards[-100:])
-                if self.logger:
-                    self.logger.info(
-                        f"{n_iter}: done {len(total_rewards)} games, reward {m_reward:.3f}"
+                encoder_optim.zero_grad()
+                loss = self.explainer.generate_with_loss(
+                    prompt=episode,
+                    context=None,
+                    ground_truth=explanation,
+                    think_start=self.llm_think_start,
+                    think_end=self.llm_think_end,
+                    text_start=self.llm_text_start
+                )
+
+                loss.backward()
+                total_norm = clip_grad_norm_(self.encoder.parameters(), max_norm=float('inf'), norm_type=2)
+                encoder_optim.step()
+
+                if self.logger is not None:
+                    self.logger.info(f"TRAIN epoch: {epoch} loss: {loss.item():.4f}, grad_norm: {total_norm.item()}, lr: {encoder_scheduler.get_last_lr()[0]:.6f}, time: {time.time() - start:.2f}s")
+
+                history.append(loss.item())
+
+            if self.logger is not None:
+                self.logger.info(f"TRAIN epoch summary: {epoch} loss: {sum(history) / len(history):.4f}")
+
+            encoder_scheduler.step()
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
+
+            loss_history.append(history)
+
+            # validation
+            self.encoder.eval()
+            history = []
+            with torch.no_grad():
+                for episode, explanation in validation_loader:
+                    loss = self.explainer.generate_with_loss(
+                        prompt=episode,
+                        context=None,
+                        ground_truth=explanation,
+                        think_start=self.llm_think_start,
+                        think_end=self.llm_think_end,
+                        text_start=self.llm_text_start
                     )
-                if self.writer:
-                    self.writer.add_scalar("reward_100", m_reward, n_iter)
-                    self.writer.add_scalar("reward", reward, n_iter)
 
-                if m_reward > self.objective:
-                    if self.logger:
-                        self.logger.info(f"Solved in {n_iter} iterations!")
-                    break
+                    history.append(loss.item())
 
-                self.agent.reset()
+                if self.logger is not None:
+                    self.logger.info(f"VALIDATION epoch: {epoch} loss: {sum(history) / len(history):.4f}")
 
-            if len(self.trajectory) < self.trajectory_size:
-                continue
+                validation_history.append(history)
 
-            states, actions = self._batch_to_tensors(self.trajectory)
-            advantages, references = self._reference_advantage(self.trajectory, states)
-            if self.agent.is_act_cont:
-                mu = self.actor(states)
-                p1 = - ((mu - actions) ** 2) / (2*torch.exp(self.actor.logstd).clamp(min=1e-3))
-                p2 = - torch.log(torch.sqrt(2 * torch.pi * torch.exp(self.actor.logstd)))
-                logprob_old = p1 + p2
+            #early_stopping
+            current_loss = sum(history) / len(history)
+            if best_validation_loss is None or current_loss < best_validation_loss:
+                best_validation_loss = current_loss
+                early_stopping_counter = 0
             else:
-                logits = self.actor(states)
-                logprob_old = torch.gather(
-                    torch.log_softmax(logits, dim=-1),
-                    1,
-                    actions.unsqueeze(0).T
-                ).squeeze()
+                early_stopping_counter += 1
+            if early_stopping_counter >= self.early_stopping:
+                if self.logger is not None:
+                    self.logger.warning("early stopping triggered")
+                break
 
-            # standartization
-            advantages = advantages - torch.mean(advantages)
-            advantages /= torch.std(advantages)
-            logprob_old = logprob_old[:-1].detach()
-
-            for _ in range(self.epochs):
-                for batch_offset in range(0, self.trajectory_size-1, self.batch_size):
-                    batch_end = batch_offset + self.batch_size
-                    batch_states = states[batch_offset:batch_end]
-                    batch_actions = actions[batch_offset:batch_end]
-                    batch_advs = advantages[batch_offset:batch_end].unsqueeze(-1)
-                    batch_refs = references[batch_offset:batch_end]
-                    batch_logprob_old = logprob_old[batch_offset:batch_end]
-
-                    # critic
-                    self.critic_optim.zero_grad()
-                    value = self.critic(batch_states)
-                    loss = F.mse_loss(value.squeeze(), batch_refs)
-                    loss.backward()
-                    self.critic_optim.step()
-
-                    # actor
-                    self.actor_optim.zero_grad()
-                    if self.agent.is_act_cont:
-                        batch_mu = self.actor(batch_states)
-                        p1 = - ((batch_mu - batch_actions) ** 2) / \
-                        (2*torch.exp(self.actor.logstd).clamp(min=1e-3))
-                        p2 = - torch.log(torch.sqrt(2 * torch.pi * torch.exp(self.actor.logstd)))
-                        batch_logprob = p1 + p2
-                    else:
-                        batch_logits = self.actor(batch_states)
-                        batch_logprob = torch.gather(
-                            torch.log_softmax(batch_logits, dim=-1),
-                            1,
-                            batch_actions.unsqueeze(0).T
-                        ).squeeze()
-                    ratio = torch.exp(batch_logprob - batch_logprob_old)
-                    surr_obj = batch_advs * ratio
-                    clip_ratio = torch.clamp(ratio, 1.0 - self.eps, 1.0 + self.eps)
-                    clip_surr_obj = batch_advs * clip_ratio
-                    loss_policy = -torch.min(surr_obj, clip_surr_obj).mean()
-                    loss_policy.backward()
-                    self.actor_optim.step()
-                    if self.writer:
-                        self.writer.add_scalar("actor loss", loss_policy, n_iter)
-                        self.writer.add_scalar("critic loss", loss, n_iter)
-            self.trajectory.clear()
-
-        env_info = EnvInfo(
-            self.env.spec.id,
-            self.agent.obs_shape if self.agent.is_obs_cont else self.agent.obs_n,
-            self.agent.act_shape if self.agent.is_act_cont else self.agent.act_n
+        if self.logger is not None: 
+            self.logger.info("training finished")
+            
+        train_info = R3LTrainInfo(
+            pathfile=self.pathfile,
+            validation_fraction=self.validation_fraction,
+            llm_model_name=self.llm_model_name,
+            llm_tokenizer_name=self.llm_tokenizer_name,
+            llm_think_start=self.llm_think_start,
+            llm_think_end=self.llm_think_end,
+            llm_text_start=self.llm_text_start,
+            modules=self.modules,
+            module_size=self.module_size,
+            hidden_size=self.hidden_size,
+            projected_size=self.projected_size,
+            encoder_device=self.encoder_device,
+            llm_device=self.llm_device,
+            n_iter=n_iter,
+            learning_rate=self.learning_rate,
+            weight_decay=self.weight_decay,
+            early_stopping=self.early_stopping,
+            seed=self.seed
         )
-        train_info = PPOTrainInfo(
-            n_iter,
-            self.objective,
-            self.gamma,
-            self.gae_lambda,
-            self.trajectory_size,
-            self.epochs,
-            self.eps,
-            self.batch_size,
-            self.learning_rate_actor,
-            self.learning_rate_critic,
-            self.seed
-        )
-        self.agent.eval()
-        return self.agent, env_info, train_info
+
+        additional_info = {
+            "loss_history": loss_history,
+            "validation_history": validation_history
+        }
+        
+        self.encoder.eval()
+        return self.explainer, train_info, additional_info

@@ -144,20 +144,29 @@ class ExplainerTrainInfo:
 class R3LTrainInfo:
     # dataset
     pathfile: str
+    validation_fraction: float
     # llm
-    model_name: str
-    tokenizer_name: str
-    llm_device: str
+    llm_model_name: str
+    llm_tokenizer_name: str
+    llm_think_start: List[int]
+    llm_think_end: List[int]
+    llm_text_start: List[int]
     # state_encoder
-    se_modules: List[str]
-    se_module_size: int
-    se_hidden_size: int
-    se_projected_size: int
+    modules: List[int]
+    module_size: int
+    hidden_size: int
+    projected_size: int
+    # devices
+    encoder_device: str
+    llm_device: str
     # iterations count
     n_iter: int
     # optimization
-    batch_size: int
     learning_rate: float
+    weight_decay: float
+    early_stopping: int
+
+    seed: int
 
     dics = asdict
 

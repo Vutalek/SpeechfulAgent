@@ -65,7 +65,7 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
     def generate_with_loss(
         self,
         prompt: List[Experience],
-        context: List[Experience] | torch.Tensor | Any,
+        context: List[Experience] | torch.Tensor | Any | None,
         ground_truth: torch.LongTensor,
         think_start: Optional[List[int]]=None,
         think_end: Optional[List[int]]=None,
@@ -82,7 +82,7 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
         
         input_embeds = self.encoder(
             collation_fn(prompt, context)
-        )
+        ).to(self.transformer.device).to(dtype=torch.bfloat16)
         
         vector_think_start = None
         vector_think_end = None
@@ -92,13 +92,13 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
             )
             if think_start is not None and think_end is not None:
                 vector_think_start = self.transformer.model.embed_tokens(
-                    torch.as_tensor(think_start, dtype=torch.long).to(self.transformer.device)
+                    torch.as_tensor([think_start], dtype=torch.long).to(self.transformer.device)
                 )
                 vector_think_end = self.transformer.model.embed_tokens(
-                    torch.as_tensor(think_end, dtype=torch.long).to(self.transformer.device)
+                    torch.as_tensor([think_end], dtype=torch.long).to(self.transformer.device)
                 )
             vector_text_start = self.transformer.model.embed_tokens(
-                torch.as_tensor(text_start, dtype=torch.long).to(self.transformer.device)
+                torch.as_tensor([text_start], dtype=torch.long).to(self.transformer.device)
             )
         
         if vector_think_start is not None and vector_think_end is not None:
@@ -135,7 +135,7 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
     def generate(
         self,
         prompt: List[Experience],
-        context: List[Experience] | torch.Tensor | Any,
+        context: List[Experience] | torch.Tensor | Any | None,
         max_tokens: int=32,
         temperature: float=0.0,
         top_k: int=0,
@@ -155,20 +155,20 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
         
         input_embeds = self.encoder(
             collation_fn(prompt, context)
-        )
+        ).to(self.transformer.device).to(dtype=torch.bfloat16)
 
         vector_think_start = None
         vector_think_end = None
         with torch.no_grad():
             if think_start is not None and think_end is not None:
                 vector_think_start = self.transformer.model.embed_tokens(
-                    torch.as_tensor(think_start, dtype=torch.long).to(self.transformer.device)
+                    torch.as_tensor([think_start], dtype=torch.long).to(self.transformer.device)
                 )
                 vector_think_end = self.transformer.model.embed_tokens(
-                    torch.as_tensor(think_end, dtype=torch.long).to(self.transformer.device)
+                    torch.as_tensor([think_end], dtype=torch.long).to(self.transformer.device)
                 )
             vector_text_start = self.transformer.model.embed_tokens(
-                torch.as_tensor(text_start, dtype=torch.long).to(self.transformer.device)
+                torch.as_tensor([text_start], dtype=torch.long).to(self.transformer.device)
             )
         
         if vector_think_start is not None and vector_think_end is not None:
