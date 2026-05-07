@@ -226,7 +226,12 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
         return info
     
     def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
-        self.encoder = R3LStateEncoder()
+        self.encoder = R3LStateEncoder(
+            modules=data["training"]["se_modules"],
+            module_size=data["training"]["se_module_size"],
+            hidden_size=data["training"]["se_hidden_size"],
+            projected_size=data["training"]["se_projected_size"]
+        )
         self.encoder.load_state_dict(torch.load(path + '/' + "encoder.pth"))
-        self.tokenizer = AutoTokenizer.from_pretrained(data["tokenizer_model"])
-        self.transformer = AutoModelForCausalLM.from_pretrained(data["llm_model"]).to(data["llm_device"])
+        self.tokenizer = AutoTokenizer.from_pretrained(data["training"]["tokenizer_name"])
+        self.transformer = AutoModelForCausalLM.from_pretrained(data["training"]["model_name"]).to(data["training"]["llm_device"])

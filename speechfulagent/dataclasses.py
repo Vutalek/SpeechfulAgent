@@ -1,7 +1,7 @@
 """Dataclasses for project."""
 
 from dataclasses import dataclass, asdict
-from typing import Tuple, Any
+from typing import Tuple, Any, List
 
 from speechfulagent.types import State, Action
 
@@ -141,3 +141,24 @@ class ExplainerTrainInfo:
     learning_rate: float
 
     dict = asdict
+
+@dataclass
+class R3LTrainInfo:
+    # dataset
+    pathfile: str
+    # llm
+    model_name: str
+    tokenizer_name: str
+    llm_device: str
+    # state_encoder
+    se_modules: List[str]
+    se_module_size: int
+    se_hidden_size: int
+    se_projected_size: int
+    # iterations count
+    n_iter: int
+    # optimization
+    batch_size: int
+    learning_rate: float
+
+    dics = asdict
