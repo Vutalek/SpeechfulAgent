@@ -168,6 +168,6 @@ class R3LTrainInfo:
 
     seed: int
 
-    dics = asdict
+    dict = asdict
 
 BaseTrainInfo = DQNTrainInfo | A3CTrainInfo | DDPGTrainInfo | PPOTrainInfo | R3LTrainInfo
