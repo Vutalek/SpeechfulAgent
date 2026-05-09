@@ -62,7 +62,7 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
 
             reward = torch.as_tensor([exp.reward], dtype=torch.float32)
             rewards = torch.concat([rewards, reward], dim=0)
-        return [states, actions, rewards.view((-1, 1))]
+        return [states.to(self.encoder.device), actions.to(self.encoder.device), rewards.view((-1, 1)).to(self.encoder.device)]
     
     def generate_with_loss(
         self,
