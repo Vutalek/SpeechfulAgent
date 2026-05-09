@@ -37,5 +37,5 @@ trainer = R3LExplainerTrainer(
     logger=logger
 )
 explainer, train_info, losses = trainer.train()
-explainer.save_model("explainer", train=train_info)
+explainer.save_model("explainer_models", train=train_info)
 print(losses)
