@@ -72,7 +72,8 @@ class R3LExplainerTrainer(BaseExplainerTrainer):
             self.modules,
             self.module_size,
             self.hidden_size,
-            self.projected_size
+            self.projected_size,
+            device=self.encoder_device
         ).to(self.encoder_device)
         self.encoder.train()
 
@@ -97,7 +98,7 @@ class R3LExplainerTrainer(BaseExplainerTrainer):
 
         best_validation_loss = None
         early_stopping_counter = 0
-        
+
         if self.logger is not None:
             self.logger.info("Start training")
 
