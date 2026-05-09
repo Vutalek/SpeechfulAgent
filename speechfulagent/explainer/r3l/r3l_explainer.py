@@ -41,26 +41,28 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
         self,
         prompt: List[Experience],
         context: List[Experience] | torch.Tensor | Any
-    ) -> List[List[torch.Tensor]]:
-        result = []
+    ) -> List[torch.Tensor]:
+        states = torch.Tensor([])
+        actions = torch.Tensor([])
+        rewards = torch.Tensor([])
         for exp in prompt:
-            tensors = []
-
-            state = torch.as_tensor([exp.state], dtype=torch.long)
             if isinstance(exp.state, int):
+                state = torch.as_tensor([exp.state], dtype=torch.long)
                 state = F.one_hot(state, self.encoder.modules_sizes[0])
-            tensors.append(state)
+            else:
+                state = torch.as_tensor([exp.state], dtype=torch.float32)
+            states = torch.concat([states, state], dim=0)
 
-            action = torch.as_tensor([exp.action], dtype=torch.long)
             if isinstance(exp.action, int):
+                action = torch.as_tensor([exp.action], dtype=torch.long)
                 action = F.one_hot(action, self.encoder.modules_sizes[1])
-            tensors.append(action)
+            else:
+                action = torch.as_tensor([exp.action], dtype=torch.float32)
+            actions = torch.concat([actions, action], dim=0)
 
             reward = torch.as_tensor([exp.reward], dtype=torch.float32)
-            tensors.append(reward)
-
-            result.append(tensors)
-        return result
+            rewards = torch.concat([rewards, reward], dim=0)
+        return [states, actions, rewards.view((-1, 1))]
     
     def generate_with_loss(
         self,
@@ -80,7 +82,7 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
         if collation_fn is None:
             collation_fn = self._default_collation_fn
         
-        input_embeds = self.encoder(
+        input_embeds = self.encoder.forward(
             collation_fn(prompt, context)
         ).to(self.transformer.device).to(dtype=torch.bfloat16)
         
@@ -115,13 +117,13 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
                 input_embeds.squeeze(0),
                 vector_ground_truth.squeeze(0) # Teacher Forcing
             ], dim=0).unsqueeze(0)
-
+        
         ignore_index = -100
         labels = torch.full((llm_input.shape[0], llm_input.shape[1]), ignore_index, dtype=torch.long, device=ground_truth.device)
         if think_start is not None and think_end is not None:
-            prefix_len = len(think_start) + input_embeds.shape[1] + len(think_end) + len(text_start)
+            prefix_len = len(think_start) + input_embeds.shape[0] + len(think_end) + len(text_start)
         else:
-            prefix_len = len(text_start) + input_embeds.shape[1]
+            prefix_len = len(text_start) + input_embeds.shape[0]
         labels[0, prefix_len:] = ground_truth
 
         outputs = self.transformer.forward(
@@ -153,7 +155,7 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
         if collation_fn is None:
             collation_fn = self._default_collation_fn
         
-        input_embeds = self.encoder(
+        input_embeds = self.encoder.forward(
             collation_fn(prompt, context)
         ).to(self.transformer.device).to(dtype=torch.bfloat16)
 
@@ -193,7 +195,7 @@ class R3LExplainer(BaseExplainer, VersioningMixin):
                     cache=cache,
                     use_cache=True,
                 )
-                next_token_logits = outputs[0, -1, -1, :]
+                next_token_logits = outputs.logits[0, -1, :]
                 cache = outputs.past_key_values
 
                 if temperature == 0.0:

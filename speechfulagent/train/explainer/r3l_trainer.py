@@ -1,5 +1,5 @@
 import time
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional, Callable
 
 import torch
 import torch.optim as optim
@@ -28,6 +28,7 @@ class R3LExplainerTrainer(BaseExplainerTrainer):
         llm_think_start: List[int]=[151644, 872, 198],
         llm_think_end: List[int]=[151645, 198],
         llm_text_start: List[int]=[151644, 77091, 198],
+        collation_fn: Optional[Callable]=None,
         encoder_device: str="cpu",
         llm_device: str="cpu",
         max_iter: int=100,
@@ -53,6 +54,7 @@ class R3LExplainerTrainer(BaseExplainerTrainer):
         self.llm_device = llm_device
         self.max_iter = max_iter
         self.early_stopping = early_stopping
+        self.collation_fn = collation_fn
         self.logger = logger
         self.seed = seed
 
@@ -115,7 +117,8 @@ class R3LExplainerTrainer(BaseExplainerTrainer):
                     ground_truth=explanation,
                     think_start=self.llm_think_start,
                     think_end=self.llm_think_end,
-                    text_start=self.llm_text_start
+                    text_start=self.llm_text_start,
+                    collation_fn=self.collation_fn
                 )
 
                 loss.backward()
@@ -149,7 +152,8 @@ class R3LExplainerTrainer(BaseExplainerTrainer):
                         ground_truth=explanation,
                         think_start=self.llm_think_start,
                         think_end=self.llm_think_end,
-                        text_start=self.llm_text_start
+                        text_start=self.llm_text_start,
+                        collation_fn=self.collation_fn
                     )
 
                     history.append(loss.item())

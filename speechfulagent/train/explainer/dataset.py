@@ -1,5 +1,5 @@
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 import torch
 from torch.utils.data import Dataset
@@ -53,10 +53,10 @@ class ExperienceDataset(Dataset):
     def __len__(self):
         return len(self.episodes)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Tuple[List[Dict[str, torch.Tensor]], torch.Tensor]:
         entry = self.episodes[idx]
         episode = entry["episode"]
         text = entry["explanation"]
         tok_exp = self.tokenizer.encode(text)
         explanation = torch.as_tensor(tok_exp, dtype=torch.long).to(self.device),
-        return episode, explanation[0]
+        return [exp.dict() for exp in episode], explanation[0]
