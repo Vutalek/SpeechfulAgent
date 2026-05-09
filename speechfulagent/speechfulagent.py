@@ -1,72 +1,54 @@
-import random
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
-import gymnasium as gym
-
-from .explainer import Explainer, embed_sequence
-from speechfulagent.dataclasses import *
+from speechfulagent.dataclasses import Experience
+from speechfulagent.agent import BaseAgent
+from speechfulagent.explainer import BaseExplainer
 
 
 class SpeechfulAgent:
     def __init__(
         self,
-        agent_dir: str='.',
-        explainer_dir: str='.',
-        agent_version: str="latest",
-        explainer_version: str="latest",
-        max_sequence_length:int = 10,
         frequency: int=10,
         max_tokens: int=32,
         temperature: float=0.5,
         top_k: int=10
     ):
-        if agent_version is None:
-            self.agent = None
-        else:
-            self.agent = Agent()
-            self.agent.load_model(agent_dir, agent_version)
-        self.episode: List[Experience] = []
+        self.agent: Optional[BaseAgent] = None
+        self.explainer: Optional[BaseExplainer] = None
         
-        if explainer_version is None:
-            self.explainer = None
-        else:
-            self.explainer = Explainer()
-            self.explainer.load_model(explainer_dir, explainer_version)
+        self.episode: List[Experience]
         self.explanations: List[str] = []
 
-        self.max_sequence_length = max_sequence_length
         self.frequency = frequency
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.top_k = top_k
 
-        self.env: gym.Env = None
-
-    def set_environment(self, env: gym.Env):
-        """Initializes env and agent."""
+    def reset(self):
+        if self.agent is None:
+            raise RuntimeError("Agent is None: Nothing to reset")
+        
         self.agent.reset()
-        state, _ = env.reset()
-        self.agent.init_state(state)
-        self.env = env
         self.episode = []
         self.explanations = []
 
-    def run(self, need_print: bool=True) -> Tuple[List[Experience], List[str], float]:
+    def run(self, need_print: bool=True, *args, **kwargs) -> Tuple[List[Experience], List[str], float]:
+        if self.agent is None or self.explainer is None:
+            raise RuntimeError("Model not loaded!")
+        
         i = 1
         while True:
-            exp = self.agent.step(self.env)
+            exp = self.agent.step()
             self.episode.append(exp)
             if self.frequency != 0 and i % self.frequency == 0:
-                tail = random.randint(1, self.max_sequence_length)
-                seq_embed, tail_embed = embed_sequence(self.episode[-self.max_sequence_length:], tail, self.max_sequence_length)
                 explanation = self.explainer.generate(
-                    tail_embed.unsqueeze(0),
-                    seq_embed.unsqueeze(0),
+                    self.episode,
+                    None,
                     self.max_tokens,
                     self.temperature,
                     self.top_k
                 )
-                explanation = f"{tail+1} actions: " + explanation
+                explanation = f"{len(self.episode)} actions: " + explanation
                 self.explanations.append(explanation)
                 if need_print:
                     print(explanation)
