@@ -32,7 +32,7 @@ class R3LStateEncoder(nn.Module):
             processed_inputs.append(
                 module.forward(input)
             )
-        exp_tensor = torch.concat(processed_inputs, dim=1)
+        exp_tensor = torch.concat(processed_inputs, dim=1).to(self.device)
         
         lstm_out, (h_n, c_n) = self.lstm(exp_tensor)
         normed = self.norm(lstm_out)
