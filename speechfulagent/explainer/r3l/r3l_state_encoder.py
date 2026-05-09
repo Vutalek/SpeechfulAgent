@@ -32,7 +32,7 @@ class R3LStateEncoder(nn.Module):
         processed_inputs = []
         for module, input in zip(self.linear_modules, inputs):
             processed_inputs.append(
-                module.forward(input)
+                module.forward(input.to(self.device))
             )
         exp_tensor = torch.concat(processed_inputs, dim=1)
         
