@@ -24,6 +24,12 @@ class SpeechfulAgent:
         self.temperature = temperature
         self.top_k = top_k
 
+    def set_agent(self, agent: BaseAgent):
+        self.agent = agent
+
+    def set_explainer(self, explainer: BaseExplainer):
+        self.explainer = explainer
+
     def reset(self):
         if self.agent is None:
             raise RuntimeError("Agent is None: Nothing to reset")

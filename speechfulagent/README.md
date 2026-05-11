@@ -1,91 +1,114 @@
-# Структура пакета
-```
-speechfulagent
-│   dataclasses.py
-│   README.md
-│   speechfulagent.py
-│   types.py
-│   versioning.py
-│   __init__.py
-│
-├───agent
-│       actor.py
-│       agent.py
-│       critic.py
-│       __init__.py
-│
-├───explainer
-│   │   explainer.py
-│   │   __init__.py
-│   │
-│   ├───preprocessing
-│   │       sequence_embed.py
-│   │       tokenizer.py
-│   │       __init__.py
-│   │
-│   └───transformer
-│           model.py
-│           positional_encoder.py
-│           state_encoder.py
-│           __init__.py
-│
-└───train
-    │   __init__.py
-    │
-    ├───agent
-    │       trainer.py
-    │       wrappers.py
-    │       __init__.py
-    │
-    └───explainer
-            dataset.py
-            trainer.py
-            __init__.py
+# Пакет `speechfulagent`
 
+Пакет содержит код для обучения агентов с подкреплением и генерации объяснений их поведения. Центральные сущности проекта - RL-агент, эпизод взаимодействия со средой и объяснитель, который превращает эпизод в текст.
+
+## Структура пакета
+
+```text
+speechfulagent/
+|-- agent/
+|   |-- base_agent.py
+|   |-- dqn.py
+|   |-- a2c.py
+|   |-- ddpg.py
+|   |-- ppo.py
+|   `-- net/
+|       |-- dqn.py
+|       |-- a2c/
+|       |-- ddpg/
+|       `-- ppo/
+|-- explainer/
+|   |-- base_explainer.py
+|   |-- openai_explainer.py
+|   |-- r3l/
+|   |   |-- r3l_explainer.py
+|   |   `-- r3l_state_encoder.py
+|   `-- tokenizer/
+|-- train/
+|   |-- agent/
+|   |   |-- dqn.py
+|   |   |-- a3c.py
+|   |   |-- ddpg.py
+|   |   |-- ppo.py
+|   |   `-- replay_buffer.py
+|   `-- explainer/
+|       |-- dataset.py
+|       |-- r3l_trainer.py
+|       `-- trainer.py
+|-- dataclasses.py
+|-- speechfulagent.py
+|-- types.py
+`-- versioning.py
 ```
 
-dataclasses.py - полезные датаклассы решения.
+## Корневые файлы
 
-speechfulagent.py - основной класс агента.
+- `dataclasses.py` - общие структуры данных: `Experience`, `EnvInfo` и dataclass-объекты с параметрами обучения.
+- `types.py` - алиасы типов `State` и `Action`.
+- `versioning.py` - миксин для сохранения и загрузки моделей по версиям `v1`, `v2`, ...
+- `speechfulagent.py` - фасад `SpeechfulAgent`, который запускает агента, накапливает эпизод и периодически вызывает объяснитель.
+- `__init__.py` - инициализатор пакета; сейчас не содержит явных экспортов.
 
-types.py - объявления типов.
+## `agent`
 
-versioning.py - класс-примесь для версионирования.
+`BaseAgent` хранит ссылку на Gymnasium environment, определяет типы пространств наблюдений/действий, управляет seed, состоянием среды и суммарной наградой.
 
-agent - пакет с модулями для построения агента.
+Реализации:
 
-actor.py - нейронная сеть актора.
+- `DQNAgent` - выбирает действие по Q-values или epsilon-greedy exploration.
+- `A2CAgent` - использует actor-critic сеть, поддерживает дискретные и непрерывные действия.
+- `DDPGAgent` - использует actor/critic и OU-процесс для exploration в непрерывных средах.
+- `PPOAgent` - генерирует действия из policy-сети для дискретного или непрерывного action space.
 
-agent.py - агент.
+`agent/net` содержит PyTorch-модели, которые используются агентами и тренерами: DQN MLP, A2C-сети, DDPG actor/critic и PPO actor/critic.
 
-critic.py - нейронная сеть критика.
+## `train.agent`
 
-explainer - пакет с модулями для построения объяснителя.
+Тренеры реализуют полный цикл обучения:
 
-preprocessing - подпакет с модулями предобработки данных.
+- `DQNTrainer` - replay buffer, target network, epsilon decay.
+- `A3CTrainer` - несколько worker-процессов, накопление градиентов и обновление общей A2C-сети.
+- `DDPGTrainer` - actor/critic loss, target networks и soft update.
+- `PPOTrainer` - сбор траекторий, generalized advantage estimation и clipped PPO objective.
+- `ReplayBuffer` - хранение и случайная выборка опыта.
 
-sequence_embed.py - содержит функцию для получения представления последовательности действий агента.
+Все тренеры возвращают кортеж: обученный агент, `EnvInfo` и dataclass с параметрами обучения.
 
-tokenizer.py - содержит класс токенизатор для работы с тектовыми данными.
+## `explainer`
 
-transformer - подпакет с модулями трансформера.
+`BaseExplainer` задает единый метод `generate(prompt, context, max_tokens, temperature, top_k, ...)`.
 
-model.py - содержит саму модель трансформера.
+Реализации:
 
-positional_encoder.py - содержит класс для позиционного кодирования входной последовательности.
+- `OpenaiExplainer` сериализует эпизод в JSON и отправляет его в OpenAI-compatible Chat Completions API.
+- `R3LExplainer` кодирует траекторию в embedding-последовательность и продолжает ее causal language model.
+- `R3LStateEncoder` преобразует последовательности состояний, действий и наград через линейные блоки, LSTM, LayerNorm и проекцию в размерность LLM.
 
-state_encoder.py - энкодер-блок трансформера для преобразования двух последовательностей.
+## `train.explainer`
 
-train - пакет с модулями для организации процесса обучения.
+- `ExperienceDataset` читает JSON-эпизоды и пары "эпизод - объяснение" из `final_dataset`.
+- `R3LExplainerTrainer` обучает state encoder для R3L-подхода. LLM загружается через `transformers`, а loss считается по целевому тексту объяснения.
+- `trainer.py` - ранний экспериментальный trainer для transformer-based объяснителя.
 
-agent - подпакет с модулями для обучения агента.
+## Поток данных R3L
 
-trainer.py - объявление класса AgentTrainer, который производит обучение агента.
+```text
+JSON episode + explanation
+        |
+        v
+ExperienceDataset
+        |
+        v
+collation_fn: states/actions/rewards -> tensors
+        |
+        v
+R3LStateEncoder
+        |
+        v
+LLM embeddings + teacher forcing
+        |
+        v
+loss по токенам объяснения
+```
 
-wrappers.py - обёртки для среды.
-
-explainer - подпакет с модулями для обучения объяснителя.
-
-dataset.py - объяление класса Dataset из pytorch для работы с набором данных.
-
-trainer.py - объявление класса ExplainerTrainer, который производит обучение объяснителя.
+Такой подход позволяет обучать небольшой encoder, который переводит траекторию агента в пространство языковой модели, не дообучая всю LLM.

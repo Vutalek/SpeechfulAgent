@@ -1,5 +1,5 @@
 import json
-from typing import List, Any
+from typing import Dict, List, Any, Optional
 
 import torch
 import openai
@@ -12,10 +12,10 @@ class OpenaiExplainer(BaseExplainer):
     def __init__(
         self,
         prompt_path: str,
-        api_key: str,
-        project: str,
-        base_url: str,
-        model: str
+        api_key: Optional[str],
+        project: Optional[str],
+        base_url: Optional[str],
+        model: Optional[str]
     ):
         super().__init__()
 
@@ -55,6 +55,9 @@ class OpenaiExplainer(BaseExplainer):
 
         context is all additional imformation for prompt
         """
+        if self.model is None:
+            raise RuntimeError("Model not present!")
+        
         completion = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -68,3 +71,9 @@ class OpenaiExplainer(BaseExplainer):
             return completion.choices[0].message.content
         else:
             return ""
+        
+    def _save_model(self, path: str, version: str, *args, **kwargs) -> Dict[str, Any]:
+        pass
+
+    def _load_model(self, path: str, data: Dict[str, Any], *args, **kwargs):
+        pass
